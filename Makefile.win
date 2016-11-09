@@ -1,0 +1,16 @@
+OBJS = main.o apr_ocl_utils.o
+CC = g++
+CFLAGS = -c -std=c++11 -I "C:\\Program Files (x86)\\Intel\\OpenCL SDK\\6.3\\include"
+LFLAGS = -L"C:\\Program Files (x86)\\Intel\\OpenCL SDK\\6.3\\lib\\x86\\" -lOpenCL
+
+pm: $(OBJS)
+	$(CC) $(OBJS) -o pm.exe $(LFLAGS)
+
+main.o: main.cpp apr_ocl_utils.cpp apr_ocl_utils.hpp
+	$(CC) $(CFLAGS) main.cpp
+
+apr_ocl_utils.o: apr_ocl_utils.cpp apr_ocl_utils.hpp
+	$(CC) $(CFLAGS) apr_ocl_utils.cpp
+
+clean:
+	del *.o *~ pm  
