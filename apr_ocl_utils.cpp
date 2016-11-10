@@ -240,4 +240,17 @@ namespace apr
 
         return program;
     }
+
+    double OCLHelper::mesuareTime(cl_event& event)
+    {
+        /* работы ядра завершена */
+        clWaitForEvents(1 , &event);
+        /* получить данные профилирования по времени */
+        cl_ulong time_start, time_end;
+        double total_time;
+        clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, nullptr);
+        clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, nullptr);
+        total_time = time_end - time_start;
+        return total_time;
+    }
 }

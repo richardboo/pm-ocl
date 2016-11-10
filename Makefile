@@ -1,7 +1,9 @@
 OBJS = main.o apr_ocl_utils.o
 CC = g++
-CFLAGS = -c -g -std=c++11 $(DEBUG)
-LFLAGS = -g -framework OpenCL
+#DEBUG = -g
+PROFILE = -D ENABLE_PROFILER
+CFLAGS = -c $(DEBUG) $(PROFILE) -std=c++11
+LFLAGS = $(DEBUG) -framework OpenCL
 
 pm: $(OBJS)
 	$(CC) $(LFLAGS) $(OBJS) -o pm

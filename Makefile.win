@@ -1,6 +1,7 @@
 OBJS = main.o apr_ocl_utils.o
 CC = g++
-CFLAGS = -c -std=c++11 -I "C:\\Program Files (x86)\\Intel\\OpenCL SDK\\6.3\\include"
+PROFILE = -D ENABLE_PROFILER
+CFLAGS = -c $(PROFILE) -std=c++11 -I "C:\\Program Files (x86)\\Intel\\OpenCL SDK\\6.3\\include"
 LFLAGS = -L"C:\\Program Files (x86)\\Intel\\OpenCL SDK\\6.3\\lib\\x86\\" -lOpenCL
 
 pm: $(OBJS)

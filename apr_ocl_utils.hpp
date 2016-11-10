@@ -72,6 +72,8 @@ namespace apr
             static std::string loadKernel (std::string name);
 
             static cl_program createProgram (const std::string& source, cl_context context);
+
+            static double mesuareTime(cl_event& event);
     };
 }
 

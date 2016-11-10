@@ -13,6 +13,9 @@
 
 #include "apr_ocl_utils.hpp" /* PPMImage, OCLHelper */
 
+/* Раскомментировать, чтобы включить режим профилирования*/
+// #define ENABLE_PROFILER  
+
 //---------------------------------------------------------------
 // Структуры, типы
 //---------------------------------------------------------------
@@ -150,12 +153,16 @@ int main (int argc, char * argv[])
     //---------------------------------------------------------------------------------
     if(run_mode == 0 || run_mode == 2) {
         std::cout << "processing sequentially..." << std::endl;
+        #ifdef ENABLE_PROFILER
         clock_t start = clock();
         apply(&idata, &pdata);  /* Запуск последовательной фильтрации */
         clock_t end = clock();
         double timeSpent = (end-start)/(double)CLOCKS_PER_SEC;
         std::cout << "secuential execution time in milliseconds = " << std::fixed 
                   << std::setprecision(3) << (timeSpent * 1000.0) << " ms" << std::endl;
+        #else
+        apply(&idata, &pdata);  /* Запуск последовательной фильтрации */
+        #endif // ENABLE_PROFILER
         std::cout << "saving image..." << std::endl;
         ouput_img.unpackData(idata.bits, packed_size); 
         apr::PPMImage::save(apr::PPMImage::toRGB(ouput_img), "s_" + std::string(dest));
@@ -288,10 +295,16 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
     }
 	/* создать хранилище данных изображения (вход-выход) */
 	cl_mem bits = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, idata->size * sizeof(uint), idata->bits, &error);
-	CheckError (error);	
-	/* создаем команду с профилированием */
+	CheckError (error);
+    /* создаем команду */	
+    #ifdef ENABLE_PROFILER
+	/* с профилированием */
 	cl_command_queue queue = clCreateCommandQueue (context, deviceIds[deviceId],
 		CL_QUEUE_PROFILING_ENABLE, &error);
+    #else
+    cl_command_queue queue = clCreateCommandQueue (context, deviceIds[deviceId],
+		{0}, &error);
+    #endif // ENABLE_PROFILER
 	CheckError (error);
     /* установить параметры */
     clSetKernelArg (kernel, 0, sizeof (cl_mem), (void *)&bits);
@@ -309,6 +322,7 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
     std::size_t work_size [3] = { work_group_x, work_group_y, 1 };
     std::cout << "work group size: " << work_size[0] << ", " << work_size[1] << std::endl;
     std::cout << "image size: " << idata->w << ", " << idata->h << std::endl;
+    double total_time = 0.0;
     if(idata->w <= max_work_group_size &&
        idata->h <= max_work_group_size) {
         const int zero = 0;
@@ -322,6 +336,10 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
                                               nullptr, work_size,
                                               nullptr, 0, 
                                               nullptr, &event));
+            #ifdef ENABLE_PROFILER
+            /* получить данные профилирования по времени */
+            total_time = apr::OCLHelper::mesuareTime(event);
+            #endif // ENABLE_PROFILER
         }
     } else {
         int partsX = ceil(idata->w / (float)max_work_group_size);
@@ -337,20 +355,18 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
                     clFinish(queue);
                     CheckError(clEnqueueNDRangeKernel(queue, kernel, 2, 
                         nullptr, work_size, nullptr, 0, nullptr, &event));
+                    #ifdef ENABLE_PROFILER
+                    /* получить данные профилирования по времени */
+                    total_time += apr::OCLHelper::mesuareTime(event);
+                    #endif // ENABLE_PROFILER
                 }
             }
         }
     }
-    /* работы ядра завершена */
-    clWaitForEvents(1 , &event);
-    /* получить данные профилирования по времени */
-    cl_ulong time_start, time_end;
-    double total_time;
-    clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, nullptr);
-    clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, nullptr);
-    total_time = time_end - time_start;
+    #ifdef ENABLE_PROFILER
     std::cout << "parallel execution time in milliseconds = " << std::fixed 
                   << std::setprecision(3) << (total_time / 1000000.0) << " ms" << std::endl;
+    #endif // ENABLE_PROFILER
     /* считать результат */
     CheckError(clEnqueueReadBuffer (queue, bits, CL_TRUE,
         0, idata->size * sizeof(uint), idata->bits, 0, nullptr, nullptr));
