@@ -2,7 +2,7 @@
   \file Perona Malic Anisotropic Diffusion
   \author Илья Шошин (ГосНИИП, АПР), 2016
 
-  \note reference: http://image.diku.dk/imagecanon/material/PeronaMalik1990.pdf
+  \note reference: https://people.eecs.berkeley.edu/~malik/papers/MP-aniso.pdf
 */
 
 #include <iostream> /* cout, setprecision, endl */
@@ -279,6 +279,13 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
     /* создать ядро */
 	cl_kernel kernel = clCreateKernel (program, "pm", &error);
 	CheckError (error);
+    /* размер глобальной памяти */
+    cl_ulong global_size;
+    CheckError(clGetDeviceInfo(deviceIds[deviceId], CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &global_size, nullptr));
+    if(global_size < idata->size * sizeof(uint)) {
+        std::cerr << "image size is too large, max available memory size for device " << deviceId << " is " << global_size << std::endl;
+        exit(EXIT_FAILURE);
+    }
 	/* создать хранилище данных изображения (вход-выход) */
 	cl_mem bits = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, idata->size * sizeof(uint), idata->bits, &error);
 	CheckError (error);	

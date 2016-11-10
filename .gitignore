@@ -4,3 +4,5 @@
 [Dd]oc
 [Bb]uild
 .vscode
+*.exe
+._*
