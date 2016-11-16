@@ -1,4 +1,4 @@
-OBJS = main.o apr_ocl_utils.o
+OBJS = main.o apr_ocl_utils.o apr_ppm_image.o
 CC = g++
 #DEBUG = -g
 PROFILE = -D ENABLE_PROFILER
@@ -13,6 +13,9 @@ main.o: main.cpp apr_ocl_utils.cpp apr_ocl_utils.hpp
 
 apr_ocl_utils.o: apr_ocl_utils.cpp apr_ocl_utils.hpp
 	$(CC) $(CFLAGS) apr_ocl_utils.cpp
+
+apr_ppm_image.o: apr_ppm_image.cpp apr_ppm_image.hpp
+	$(CC) $(CFLAGS) apr_ppm_image.cpp
 
 clean:
 	\rm *.o *~ pm

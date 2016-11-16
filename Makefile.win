@@ -1,4 +1,4 @@
-OBJS = main.o apr_ocl_utils.o
+OBJS = main.o apr_ocl_utils.o apr_ppm_image.o
 CC = g++
 PROFILE = -D ENABLE_PROFILER
 CFLAGS = -c $(PROFILE) -std=c++11 -I "C:\\Program Files (x86)\\Intel\\OpenCL SDK\\6.3\\include"
@@ -12,6 +12,9 @@ main.o: main.cpp apr_ocl_utils.cpp apr_ocl_utils.hpp
 
 apr_ocl_utils.o: apr_ocl_utils.cpp apr_ocl_utils.hpp
 	$(CC) $(CFLAGS) apr_ocl_utils.cpp
+
+apr_ppm_image.o: apr_ppm_image.cpp apr_ppm_image.hpp
+	$(CC) $(CFLAGS) apr_ppm_image.cpp
 
 clean:
 	del *.o *~ pm  

@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 #include <cstdlib>
+#include <iostream>
 
 #define CheckError(error)               \
     do                                  \
@@ -24,32 +25,6 @@
             std::exit (1);              \
         }                               \
     }while(false)                       \
-
-namespace apr
-{
-    class PPMImage
-    {
-        public:
-
-            PPMImage();
-            ~PPMImage();
-            PPMImage(int w, int h);
-            PPMImage(std::vector<char> data, int w, int h);
-            PPMImage(const PPMImage& other);
-            PPMImage& operator=(const PPMImage& other); 
-        public:
-            static PPMImage load(std::string path);
-            static void save(const PPMImage& input, std::string path);
-            static PPMImage toRGBA (const PPMImage& input);
-            static PPMImage toRGB (const PPMImage& input);
-            int packData(unsigned int** packed);
-            void unpackData(unsigned int* packed, int size);
-            void clear();
-        public:
-            std::vector<char> pixel;
-	        int width, height;
-    };
-}
 
 namespace apr
 {
@@ -72,6 +47,11 @@ namespace apr
             static std::string loadKernel (std::string name);
 
             static cl_program createProgram (const std::string& source, cl_context context);
+
+            static bool buildProgram(cl_program program, 
+                                     cl_uint deviceIdCount, 
+                                     const cl_device_id* deviceIds,
+                                     int deviceId);
 
             static double mesuareTime(cl_event& event);
     };

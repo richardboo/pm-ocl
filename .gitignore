@@ -1,6 +1,7 @@
 *.pdf
 *.ppm
 *.dll
+*.o
 [Dd]oc
 [Bb]uild
 .vscode

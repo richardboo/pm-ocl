@@ -14,9 +14,12 @@
 #include <cmath>    /* exp */
 #include <ctime>    /* clock_t */
 
-#include "apr_ocl_utils.hpp" /* PPMImage, OCLHelper */
+#include "apr_ppm_image.hpp" /* PPMImage  */
+#include "apr_ocl_utils.hpp" /* OCLHelper */
 
-/* Раскомментировать, чтобы включить режим профилирования*/
+/* Раскомментировать, чтобы включить режим профилирования
+   или использовать -D ENABLE_PROFILER в настройке компилятора
+*/
 // #define ENABLE_PROFILER  
 
 //---------------------------------------------------------------
@@ -65,6 +68,7 @@ typedef struct
 // Прототипы
 //---------------------------------------------------------------
 char* getArgOption(char**, char**, const char*);
+bool isArgOption(char **, char **, const char*);
 void  print_help();
 void  run_parallel(img_data*, proc_data*, int, int, std::string);
 int   get_channel(uint , int );
@@ -72,64 +76,69 @@ float quadric(int , float );
 float exponential(int , float );
 int   apply_channel(img_data* , proc_data* , int , int , int );
 void  apply(img_data* , proc_data* );
-void  report(cl_platform_id platformId, cl_device_id deviceId, int iterations, int width, int height, double time);
+void  report(cl_platform_id, cl_device_id, 
+             int , int , int , double);
 //---------------------------------------------------------------
 // Точка входа
 //---------------------------------------------------------------
 
 int main (int argc, char * argv[])
 {
+    /* значения по умолчанию */
     int iterations = 16;
-    int conduction_function = 1; /* [0, 1] */
     float thresh = 30.0f;
-    float lambda = 0.25f;
-    int run_mode = 1;
-    std::string kernel_file = "kernel.cl"; 
+    int conduction_function = 1; /* [0, 1] */
+    const float lambda = 0.25f;
     int platformId = -1; 
     int deviceId = -1;
-
-    char* pinfo_str = getArgOption(argv, argv + argc, "-pi");
-    if(pinfo_str) {
-        /* получить доступные платформы */
-	    apr::OCLHelper::available_platforms(nullptr);
-        exit(0);
+    int run_mode = 1;   /*[0,1,2]*/
+    std::string kernel_file = "kernel.cl"; 
+    /* считывание аргументов командной строки */
+    if(isArgOption(argv, argv + argc, "-h")) {  /* справка */
+        print_help();
+        exit(EXIT_SUCCESS); // -> EXIT_SUCCESS
     }
-    char* dinfo_str = getArgOption(argv, argv + argc, "-di");
+    if(isArgOption(argv, argv + argc, "-pi")) { /* список платформ */
+        /* получить доступные платформы */  
+	    apr::OCLHelper::available_platforms(nullptr);
+        exit(EXIT_SUCCESS); // -> EXIT_SUCCESS
+    }
+    char* dinfo_str = getArgOption(argv, argv + argc, "-di");   /* список устройств для платформы */
     if(dinfo_str) {
         /* получить доступplatformIdsные платформы */
         std::vector<cl_platform_id> platformIds = apr::OCLHelper::available_platforms(nullptr);
-        int idx = atoi(dinfo_str);
+        int idx = atoi(dinfo_str);  // индекс выбранной платформы
         if(idx >= 0 && idx < platformIds.size()) {
             /* получить доступные устройства */
             std::vector<cl_device_id> deviceIds = apr::OCLHelper::available_devices(
             platformIds[idx], nullptr, nullptr);
         }
-        exit(0);
+        exit(EXIT_SUCCESS); // -> EXIT_SUCCESS
     }
-
+    /* проверить количество аргументов командной строки */
     if(argc < 3) {
         print_help();
         exit(EXIT_FAILURE);
     }
-    char* src  = argv[1];
-    char* dest = argv[2];
+    char* src  = argv[1];   // входящее изображение
+    char* dest = argv[2];   // результат обработки
 
     try {
-        char* platform_str = getArgOption(argv, argv + argc, "-p");
-        char* device_str = getArgOption(argv, argv + argc, "-d");
-        char* kernel_file_str = getArgOption(argv, argv + argc, "-k");
-        if(kernel_file_str) kernel_file = std::string(kernel_file_str); 
+        char* iter_str      = getArgOption(argv, argv + argc, "-i");        /* кол-во проходов фильтра */
+        char* thresh_str    = getArgOption(argv, argv + argc, "-t");        /* коэффициент чувствительности к границам */
+        char* conduction_function_str = getArgOption(argv, argv + argc, "-f");  /* функция для получения коэффициента сглаживания */
+        char* platform_str  = getArgOption(argv, argv + argc, "-p");        /* индекс платформы */
+        char* device_str    = getArgOption(argv, argv + argc, "-d");        /* индекс устройства */
+        char* rmode_str     = getArgOption(argv, argv + argc, "-r");        /* режим запуска [0,1,2] */
+        char* kernel_file_str = getArgOption(argv, argv + argc, "-k");      /* файл с ядром программы*/
+        if(iter_str) iterations = atoi(iter_str);
+        if(thresh_str) thresh = atoi(thresh_str);
+        if(conduction_function_str) conduction_function = atoi(conduction_function_str);
         if(platform_str) platformId = atoi(platform_str); 
         if(device_str)   deviceId = atoi(device_str);
-        char* rmode_str = getArgOption(argv, argv + argc, "-r");
         if(rmode_str) run_mode = atoi(rmode_str);
         if(run_mode < 0 || run_mode > 2) run_mode = 2;
-        char* iter_str = getArgOption(argv, argv + argc, "-i");
-        if(iter_str) iterations = atoi(iter_str);
-        char* conduction_function_str = getArgOption(argv, argv + argc, "-f");
-        if(conduction_function_str) conduction_function = atoi(conduction_function_str);
-        char* thresh_str = getArgOption(argv, argv + argc, "-t");
-        if(thresh_str) thresh = atoi(thresh_str);
+        if(kernel_file_str) kernel_file = std::string(kernel_file_str);
     } catch(...) {
         std::cerr << "failed to parse arguments, using defaults..." << std::endl;
     }
@@ -143,7 +152,13 @@ int main (int argc, char * argv[])
     /* Загрузка изображения (.ppm) */
     /* .ppm хранит rgb изображения, но алгоритм адаптировван
        для работы с rgba, поэтому выполним конвертацию  */
-    apr::PPMImage input_img = apr::PPMImage::toRGBA(apr::PPMImage::load(src));
+    apr::PPMImage input_img;
+    try {
+        input_img = apr::PPMImage::toRGBA(apr::PPMImage::load(src));
+    } catch(std::invalid_argument e) {
+        std::cerr << e.what();
+        exit(EXIT_FAILURE);
+    }
     /* "Упаковка" rgba каналов в unsigned int */
     unsigned int* packed_data = nullptr;
     size_t packed_size = input_img.packData(&packed_data);
@@ -157,7 +172,7 @@ int main (int argc, char * argv[])
     /* Отфильтрованное изображение */
     apr::PPMImage ouput_img(idata.w, idata.h);
     //---------------------------------------------------------------------------------
-    if(run_mode == 0 || run_mode == 2) {
+    if(run_mode == 0 || run_mode == 2) {    // Последовательная фильтрация 
         std::cout << "processing sequentially..." << std::endl;
         #ifdef ENABLE_PROFILER
         clock_t start = clock();
@@ -176,7 +191,7 @@ int main (int argc, char * argv[])
         packed_data = nullptr;
     }
     //---------------------------------------------------------------------------------
-    if(run_mode == 1 || run_mode == 2) {
+    if(run_mode == 1 || run_mode == 2) {    // Параллельная фильтрация
         std::cout << "processing in parallel..." << std::endl;
         input_img = apr::PPMImage::toRGBA(apr::PPMImage::load(src));
         packed_size = input_img.packData(&packed_data);
@@ -221,20 +236,48 @@ char* getArgOption(char **begin, char **end, const char* option)
     return 0;
 }
 /*!
+* \brief Указан ли флаг
+*
+* \code{.c++}
+    bool flag = isArgOption(argv, argv + argc, "-f");
+* \endcode
+*/
+bool isArgOption(char **begin, char **end, const char* option)
+{
+    const char* optr = 0;
+    char* bptr = 0;
+    for (; begin != end; ++begin) {
+        optr = option;
+        bptr = *begin;
+        for (; *bptr == *optr; ++bptr, ++optr) {
+            if(*bptr == '\0') {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+/*!
 * \brief Краткое руководство к запуску программы
 */
 void print_help() {
-    std::cout << "./pm source_file.ppm destination_file.ppm [-pi -di -r -p -d -k -i -f t]\n \
-    -i <iterations>\n \ 
-    -t <conduction function threshold> ]\n \
-    -f <conduction function (0-quadric [wide regions over smaller ones],\n
-     1-exponential [high-contrast edges over low-contrast])>\n \
-    -pi (shows platform list)\n \
-    -di <platform index> (shows devices list)\n \
-    -r <run mode (0-sequentional,1-parallel {default},2-both )>\n \
-    -p <platform idx>\n \
-    -d <device idx>\n \
-    -k <kernel file (default:kernel.cl)>" << std::endl;
+    std::cout << "./pm source_file.ppm destination_file.ppm [-i -t -f -p -d -r -k]" << std::endl <<
+                 "----------------------------------------------------------------" << std::endl <<
+    "   -i <iterations>" << std::endl <<
+    "   -t <conduction function threshold> ]" << std::endl <<
+    "   -f <conduction function (0-quadric [wide regions over smaller ones]," <<
+    "1-exponential [high-contrast edges over low-contrast])>"  << std::endl <<
+    "   -p <platform idx>"  << std::endl <<
+    "   -d <device idx>"  << std::endl <<
+    "   -r <run mode (0-sequentional,1-parallel {default},2-both )>"  << std::endl <<
+    "   -k <kernel file (default:kernel.cl)>" << std::endl <<
+    "./pm [-pi -di -h]" << std::endl <<
+    "-----------------" << std::endl <<
+    "   -pi (shows platform list)"  << std::endl <<
+    "   -di <platform index> (shows devices list)" << std::endl <<
+    "   -h (help)" << std::endl <<
+    "Example:" << std::endl <<
+    "   ./pm images/in.ppm images/out.ppm -i 16 -t 30 -f 1"<< std::endl;
 }
 //---------------------------------------------------------------
 // Параллельная фильтрация
@@ -247,13 +290,20 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
     int recommendedPlatformId;
     int recommendedDeviceId;
     cl_uint deviceIdCount;
+    std::vector<cl_platform_id> platformIds;
+    std::vector<cl_device_id> deviceIds;
+    cl_int error = CL_SUCCESS;
+    cl_context context;
+    cl_program program;
+    cl_kernel kernel;
+    cl_command_queue queue;
     /* получить доступные платформы */
-	std::vector<cl_platform_id> platformIds = apr::OCLHelper::available_platforms(&recommendedPlatformId);
+	platformIds = apr::OCLHelper::available_platforms(&recommendedPlatformId);
     if(platformId < 0 || platformId >= platformIds.size()) {
         platformId = recommendedPlatformId; 
     }
 	/* получить доступные устройства */
-	std::vector<cl_device_id> deviceIds = apr::OCLHelper::available_devices(
+	deviceIds = apr::OCLHelper::available_devices(
         platformIds[platformId], &deviceIdCount, &recommendedDeviceId);
     if(deviceId < 0 || deviceId >= deviceIds.size()) {
         deviceId = recommendedDeviceId; 
@@ -267,33 +317,19 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
         reinterpret_cast<cl_context_properties>(platformIds[platformId]),
 		0, 0
 	};
-	cl_int error = CL_SUCCESS;
-	cl_context context = clCreateContext (contextProperties, deviceIdCount,
-		deviceIds.data (), nullptr, nullptr, &error);
+	context = clCreateContext (contextProperties, deviceIdCount, deviceIds.data (), nullptr, nullptr, &error);
 	CheckError (error);
 	std::cout << "context created" << std::endl;
 	/* создать бинарник из кода программы */
     std::cout << "kernel file: " << kernel_file << std::endl;
-	cl_program program = apr::OCLHelper::createProgram(
+	program = apr::OCLHelper::createProgram(
         apr::OCLHelper::loadKernel(kernel_file), context);
     /* скомпилировать программу */
-	cl_int err = clBuildProgram (program, deviceIdCount, deviceIds.data (), 
-		nullptr, nullptr, nullptr);
-    /* вывод ошибок при наличии */
-    if (err == CL_BUILD_PROGRAM_FAILURE) {
-        /* размер лога */
-        size_t log_size;
-        clGetProgramBuildInfo(program, deviceIds[deviceId], CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
-        /* выделить память под лог */
-        char *log = (char *) malloc(log_size);
-        /* получить лог */
-        clGetProgramBuildInfo(program, deviceIds[deviceId], CL_PROGRAM_BUILD_LOG, log_size, log, nullptr);
-        /* распечатать лог */
-        std::cerr << log << std::endl;
+	if(!apr::OCLHelper::buildProgram(program, deviceIdCount, deviceIds.data(), deviceId)) {
         exit(EXIT_FAILURE);
     }
     /* создать ядро */
-	cl_kernel kernel = clCreateKernel (program, "pm", &error);
+	kernel = clCreateKernel (program, "pm", &error);
 	CheckError (error);
     /* размер глобальной памяти */
     cl_ulong global_size;
@@ -308,11 +344,9 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
     /* создаем команду */	
     #ifdef ENABLE_PROFILER
 	/* с профилированием */
-	cl_command_queue queue = clCreateCommandQueue (context, deviceIds[deviceId],
-		CL_QUEUE_PROFILING_ENABLE, &error);
+	queue = clCreateCommandQueue (context, deviceIds[deviceId], CL_QUEUE_PROFILING_ENABLE, &error);
     #else
-    cl_command_queue queue = clCreateCommandQueue (context, deviceIds[deviceId],
-		{0}, &error);
+    queue = clCreateCommandQueue (context, deviceIds[deviceId], {0}, &error);
     #endif // ENABLE_PROFILER
 	CheckError (error);
     /* установить параметры */
@@ -325,7 +359,8 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
     cl_event event;
     /* максимальный размер рабочей группы */
     size_t max_work_group_size;
-    CheckError(clGetDeviceInfo(deviceIds[deviceId], CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), &max_work_group_size, nullptr));
+    CheckError(clGetDeviceInfo(deviceIds[deviceId], CL_DEVICE_MAX_WORK_GROUP_SIZE, 
+               sizeof(size_t), &max_work_group_size, nullptr));
     size_t work_group_x = std::min((size_t)idata->w, max_work_group_size);
     size_t work_group_y = std::min((size_t)idata->h, max_work_group_size);
     std::size_t work_size [3] = { work_group_x, work_group_y, 1 };
@@ -374,18 +409,17 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
     }
     #ifdef ENABLE_PROFILER
     std::cout << "parallel execution time in milliseconds = " << std::fixed 
-                  << std::setprecision(3) << (total_time / 1000000.0) << " ms" << std::endl;
+              << std::setprecision(3) << (total_time / 1000000.0) << " ms" << std::endl;
     #endif // ENABLE_PROFILER
     report( platformIds[platformId], deviceIds[deviceId], pdata->iterations, idata->w, idata->h, total_time/1000000.0);
     /* считать результат */
-    CheckError(clEnqueueReadBuffer (queue, bits, CL_TRUE,
-        0, idata->size * sizeof(uint), idata->bits, 0, nullptr, nullptr));
+    CheckError(clEnqueueReadBuffer (queue, bits, CL_TRUE, 0, idata->size * sizeof(uint), idata->bits, 0, nullptr, nullptr));
     /* очистка */
-    clReleaseMemObject (bits);
-	clReleaseCommandQueue (queue);
-	clReleaseKernel (kernel);
-	clReleaseProgram (program);
-	clReleaseContext (context);
+    clReleaseMemObject(bits);
+	clReleaseCommandQueue(queue);
+	clReleaseKernel(kernel);
+	clReleaseProgram(program);
+	clReleaseContext(context);
 }
 
 void  report(cl_platform_id platformId, cl_device_id deviceId, int iterations, int width, int height, double time)
