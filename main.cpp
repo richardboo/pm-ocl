@@ -3,9 +3,12 @@
   \author Илья Шошин (ГосНИИП, АПР), 2016
 
   \note reference: https://people.eecs.berkeley.edu/~malik/papers/MP-aniso.pdf
+  \todo Сделать поддержку обработки изображений, где ширина != высоте.
+  \todo Исправить считывание параметров на windows.
 */
 
 #include <iostream> /* cout, setprecision, endl */
+#include <fstream>
 #include <iomanip>  /* fixed */
 #include <cstdlib>  /* exit */
 #include <cmath>    /* exp */
@@ -69,16 +72,18 @@ float quadric(int , float );
 float exponential(int , float );
 int   apply_channel(img_data* , proc_data* , int , int , int );
 void  apply(img_data* , proc_data* );
+void  report(cl_platform_id platformId, cl_device_id deviceId, int iterations, int width, int height, double time);
 //---------------------------------------------------------------
 // Точка входа
 //---------------------------------------------------------------
+
 int main (int argc, char * argv[])
 {
     int iterations = 16;
     int conduction_function = 1; /* [0, 1] */
     float thresh = 30.0f;
     float lambda = 0.25f;
-    int run_mode = 2;
+    int run_mode = 1;
     std::string kernel_file = "kernel.cl"; 
     int platformId = -1; 
     int deviceId = -1;
@@ -108,6 +113,7 @@ int main (int argc, char * argv[])
     }
     char* src  = argv[1];
     char* dest = argv[2];
+
     try {
         char* platform_str = getArgOption(argv, argv + argc, "-p");
         char* device_str = getArgOption(argv, argv + argc, "-d");
@@ -165,7 +171,7 @@ int main (int argc, char * argv[])
         #endif // ENABLE_PROFILER
         std::cout << "saving image..." << std::endl;
         ouput_img.unpackData(idata.bits, packed_size); 
-        apr::PPMImage::save(apr::PPMImage::toRGB(ouput_img), "s_" + std::string(dest));
+        apr::PPMImage::save(apr::PPMImage::toRGB(ouput_img), std::string(dest));
         delete[] packed_data;
         packed_data = nullptr;
     }
@@ -179,7 +185,7 @@ int main (int argc, char * argv[])
         run_parallel(&idata, &pdata, platformId, deviceId, kernel_file); 
         std::cout << "saving image..." << std::endl;
         ouput_img.unpackData(idata.bits, packed_size);
-        apr::PPMImage::save(apr::PPMImage::toRGB(ouput_img), "p_" + std::string(dest));
+        apr::PPMImage::save(apr::PPMImage::toRGB(ouput_img), std::string(dest));
         delete[] packed_data;
         packed_data = nullptr;
     }
@@ -218,15 +224,17 @@ char* getArgOption(char **begin, char **end, const char* option)
 * \brief Краткое руководство к запуску программы
 */
 void print_help() {
-    std::cout << "./pm source_file_ppm destination_file_ppm [ -pi (shows platform list) \
-    -di <platform index> (shows devices list) -r <run mode \
-    -p <platform idx>   \
-    -d <device idx>     \
-    -k <kernel file (default:kernel.cl)> \
-    (0-sequentional,1-parallel,2-both {default} )> -i <iterations> \
-    -f <conduction function (0-quadric [wide regions over smaller ones], \
-    1-exponential [high-contrast edges over low-contrast])> \
-    -t <conduction function threshold> ]" << std::endl;
+    std::cout << "./pm source_file.ppm destination_file.ppm [-pi -di -r -p -d -k -i -f t]\n \
+    -i <iterations>\n \ 
+    -t <conduction function threshold> ]\n \
+    -f <conduction function (0-quadric [wide regions over smaller ones],\n
+     1-exponential [high-contrast edges over low-contrast])>\n \
+    -pi (shows platform list)\n \
+    -di <platform index> (shows devices list)\n \
+    -r <run mode (0-sequentional,1-parallel {default},2-both )>\n \
+    -p <platform idx>\n \
+    -d <device idx>\n \
+    -k <kernel file (default:kernel.cl)>" << std::endl;
 }
 //---------------------------------------------------------------
 // Параллельная фильтрация
@@ -281,7 +289,8 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
         /* получить лог */
         clGetProgramBuildInfo(program, deviceIds[deviceId], CL_PROGRAM_BUILD_LOG, log_size, log, nullptr);
         /* распечатать лог */
-        std::cout << log;
+        std::cerr << log << std::endl;
+        exit(EXIT_FAILURE);
     }
     /* создать ядро */
 	cl_kernel kernel = clCreateKernel (program, "pm", &error);
@@ -367,6 +376,7 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
     std::cout << "parallel execution time in milliseconds = " << std::fixed 
                   << std::setprecision(3) << (total_time / 1000000.0) << " ms" << std::endl;
     #endif // ENABLE_PROFILER
+    report( platformIds[platformId], deviceIds[deviceId], pdata->iterations, idata->w, idata->h, total_time/1000000.0);
     /* считать результат */
     CheckError(clEnqueueReadBuffer (queue, bits, CL_TRUE,
         0, idata->size * sizeof(uint), idata->bits, 0, nullptr, nullptr));
@@ -376,6 +386,18 @@ void run_parallel(img_data* idata, proc_data* pdata, int platformId, int deviceI
 	clReleaseKernel (kernel);
 	clReleaseProgram (program);
 	clReleaseContext (context);
+}
+
+void  report(cl_platform_id platformId, cl_device_id deviceId, int iterations, int width, int height, double time)
+{
+       std::ofstream out ("report.md", std::ios::out | std::ios::app);
+       out << "|platform & device | " << "iterations | " << "width x height, px | " << "time, ms |" << std::endl;
+       out << "|------------------|------------|--------------------|----------|" << std::endl; 
+       out << " | " << apr::OCLHelper::platformName(platformId) << " " << 
+              apr::OCLHelper::deviceName(deviceId)     << " | " <<
+              iterations << " | " << width << " x " << height << " | " << 
+              std::fixed << std::setprecision(3) << time << " | ";
+       out.close();
 }
 
 //---------------------------------------------------------------

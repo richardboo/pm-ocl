@@ -89,6 +89,7 @@ namespace apr
             out << input.width << " " << input.height << "\n";
             out << "255\n";
             out.write (input.pixel.data (), input.pixel.size ());
+            out.close();
         }
 
         PPMImage PPMImage::toRGBA (const PPMImage& input)
