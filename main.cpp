@@ -76,6 +76,7 @@ float quadric(int , float );
 float exponential(int , float );
 int   apply_channel(img_data* , proc_data* , int , int , int );
 void  apply(img_data* , proc_data* );
+void  binarization(img_data* , proc_data* );
 void  report(cl_platform_id, cl_device_id, 
              int , int , int , double);
 //---------------------------------------------------------------
@@ -177,6 +178,7 @@ int main (int argc, char * argv[])
         #ifdef ENABLE_PROFILER
         clock_t start = clock();
         apply(&idata, &pdata);  /* Запуск последовательной фильтрации */
+        //binarization(&idata, &pdata);  /* бинаризация */
         clock_t end = clock();
         double timeSpent = (end-start)/(double)CLOCKS_PER_SEC;
         std::cout << "secuential execution time in milliseconds = " << std::fixed 
@@ -485,6 +487,26 @@ void apply(img_data* idata, proc_data* pdata)
                                             ((g & 0xff) << 8)  | 
                                             (b & 0xff);
             }
+        }
+    }
+}
+
+void binarization(img_data* idata, proc_data* pdata)
+{
+    int tresh = 127;
+    for (int x = 0; x < idata->w; ++x) {
+        for (int y = 0; y < idata->h; ++y) {
+            int r = get_channel(idata->bits[y+x*idata->h], 0);
+            int g = get_channel(idata->bits[y+x*idata->h], 1);
+            int b = get_channel(idata->bits[y+x*idata->h], 2);
+            int gray = sqrt((r*r+g*g+b*b)/3.0);   // to b&w
+            int bin = gray >= tresh ? 255 : 0;    // binarization
+            bin = !bin ? 255 : 0;                 // inverted  
+            int a = 1;
+            idata->bits[y+x*idata->h] = ((a & 0xff) << 24) | 
+                                        ((bin & 0xff) << 16) | 
+                                        ((bin & 0xff) << 8)  | 
+                                            (bin & 0xff);
         }
     }
 }
