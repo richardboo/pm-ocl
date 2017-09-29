@@ -1,10 +1,4 @@
-*.pdf
-*.ppm
-*.dll
-*.o
-[Dd]oc
-[Bb]uild
 .vscode
-*.exe
+[Bb]uild
+[Dd]oc
 ._*
-article
