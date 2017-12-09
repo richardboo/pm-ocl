@@ -131,9 +131,6 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	char *src  = argv[1];   // входящее изображение
-	char *dest = argv[2];   // результат обработки
-
 	try {
 		char *iter_str      = getArgOption(argv, argv + argc, "-i");        /* кол-во проходов фильтра */
 		char *thresh_str    = getArgOption(argv, argv + argc, "-t");        /* коэффициент чувствительности к границам */
@@ -161,6 +158,9 @@ int main(int argc, char *argv[])
 	} catch(...) {
 		std::cerr << "failed to parse arguments, using defaults..." << std::endl;
 	}
+
+	char *src  = argv[argc - 2];   // входящее изображение
+	char *dest = argv[argc - 1];   // результат обработки
 
 	std::cout << "number of iterations: " << iterations << std::endl;
 	std::cout << "conduction function (0-quadric, 1-exponential): "
@@ -201,23 +201,16 @@ int main(int argc, char *argv[])
 #ifdef ENABLE_PROFILER
 		clock_t start = clock();
 		apply(&idata, &pdata);  /* Запуск последовательной фильтрации */
-		//ouput_img.unpack_data(idata.bits, packed_size);
-		//PPMImage::save(PPMImage::to_rgb(ouput_img), std::string(dest));
-		//binarization(&idata, &pdata);  /* бинаризация */
-		//edges(&idata, &pdata);
 		clock_t end = clock();
 		double timeSpent = (end-start)/(double)CLOCKS_PER_SEC;
-		std::cout << "secuential execution time in milliseconds = " << std::fixed
+		std::cout << "sequential execution time in milliseconds = " << std::fixed
 		          << std::setprecision(3) << (timeSpent * 1000.0) << " ms" << std::endl;
 #else
 		apply(&idata, &pdata);  /* Запуск последовательной фильтрации */
 #endif // ENABLE_PROFILER
 		std::cout << "saving image..." << std::endl;
-		//PPMImage edges_img(idata.w, idata.h);
-		//edges_img.unpack_data(idata.bits, packed_size);
 		ouput_img.unpack_data(idata.bits, packed_size);
 		PPMImage::save(PPMImage::to_rgb(ouput_img), std::string(dest));
-		//PPMImage::save(PPMImage::to_rgb(edges_img), std::string("images/edges.ppm"));
 		delete[] packed_data;
 		packed_data = nullptr;
 	}
@@ -440,13 +433,13 @@ void run_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceI
 		int offsetX = 0, offsetY = 0;
 
 		for(int it = 0; it < pdata->iterations; ++it) {
-			for(int px = 0; px < partsX; ++px) {
-				offsetX = px*work_size[0];
-				clSetKernelArg(kernel, 6, sizeof(int), (void *)&offsetX);
+			for(int py = 0; py < partsY; ++py) {
+				offsetY = py*work_size[1];
+				clSetKernelArg(kernel, 7, sizeof(int), (void *)&offsetY);
 
-				for(int py = 0; py < partsY; ++py) {
-					offsetY = py*work_size[1];
-					clSetKernelArg(kernel, 7, sizeof(int), (void *)&offsetY);
+				for(int px = 0; px < partsX; ++px) {
+					offsetX = px*work_size[0];
+					clSetKernelArg(kernel, 6, sizeof(int), (void *)&offsetX);
 					clFinish(queue);
 					CheckOCLError(clEnqueueNDRangeKernel(queue, kernel, 2,
 					                                     nullptr, work_size, nullptr, 0, nullptr, &event));
@@ -519,11 +512,11 @@ float exponential(int norm, float thresh)
 
 int apply_channel(img_data *idata, proc_data *pdata, int x, int y, int ch)
 {
-	int p = get_channel(idata->bits[y + x * idata->h], ch);
-	int deltaW = get_channel(idata->bits[y + (x-1) * idata->h], ch) - p;
-	int deltaE = get_channel(idata->bits[y + (x+1) * idata->h], ch) - p;
-	int deltaS = get_channel(idata->bits[y+1 + x * idata->h], ch) - p;
-	int deltaN = get_channel(idata->bits[y-1 + x * idata->h], ch) - p;
+	int p = get_channel(idata->bits[x + y * idata->w], ch);
+	int deltaW = get_channel(idata->bits[x + (y-1) * idata->w], ch) - p;
+	int deltaE = get_channel(idata->bits[x + (y+1) * idata->w], ch) - p;
+	int deltaS = get_channel(idata->bits[x+1 + y * idata->w], ch) - p;
+	int deltaN = get_channel(idata->bits[x-1 + y * idata->w], ch) - p;
 	float cN = pdata->conduction_ptr(abs(deltaN), pdata->thresh);
 	float cS = pdata->conduction_ptr(abs(deltaS), pdata->thresh);
 	float cE = pdata->conduction_ptr(abs(deltaE), pdata->thresh);
@@ -533,14 +526,15 @@ int apply_channel(img_data *idata, proc_data *pdata, int x, int y, int ch)
 
 void apply(img_data *idata, proc_data *pdata)
 {
+	std::cout << idata->w << " " << idata->h << "\n"; 
 	for(int it = 0; it < pdata->iterations; ++it) {
-		for(int x = 1; x < idata->w-1; ++x) {
-			for(int y = 1; y < idata->h-1; ++y) {
+		for(int y = 1; y < idata->h-1; ++y) {
+			for(int x = 1; x < idata->w-1; ++x) {
 				int r = apply_channel(idata, pdata, x, y, 0);
 				int g = apply_channel(idata, pdata, x, y, 1);
 				int b = apply_channel(idata, pdata, x, y, 2);
-				int a = get_channel(idata->bits[y+x*idata->h], 3);
-				idata->bits[y+x*idata->h] = ((a & 0xff) << 24) |
+				int a = get_channel(idata->bits[x+y*idata->w], 3);
+				idata->bits[x+y*idata->w] = ((a & 0xff) << 24) |
 				                            ((r & 0xff) << 16) |
 				                            ((g & 0xff) << 8)  |
 				                            (b & 0xff);

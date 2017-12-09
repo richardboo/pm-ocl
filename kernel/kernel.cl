@@ -16,7 +16,7 @@ int get_channel(uint rgba, int channel)
 			return (rgba & 0xff);           // blue
 
 		default:
-			return rgba >> 24;             // alpha
+			return rgba >> 24;              // alpha
 	}
 }
 
@@ -46,11 +46,11 @@ __kernel void pm(__global uint *bits,
 		uint rgba[4];
 
 		for(int ch = 0; ch < 3; ++ch) {
-			int p = get_channel(bits[y + x * h], ch);
-			int deltaW = get_channel(bits[y + (x-1) * h], ch) - p;
-			int deltaE = get_channel(bits[y + (x+1) * h], ch) - p;
-			int deltaS = get_channel(bits[y+1 + x * h], ch) - p;
-			int deltaN = get_channel(bits[y-1 + x * h], ch) - p;
+			int p = get_channel(bits[x + y * w], ch);
+			int deltaW = get_channel(bits[x + (y-1) * w], ch) - p;
+			int deltaE = get_channel(bits[x + (y+1) * w], ch) - p;
+			int deltaS = get_channel(bits[x+1 + y * w], ch) - p;
+			int deltaN = get_channel(bits[x-1 + y * w], ch) - p;
 			float cN = eval_func ? exponential(abs(deltaN), thresh)
 			           : quadric(abs(deltaN), thresh);
 			float cS = eval_func ? exponential(abs(deltaS), thresh)
@@ -63,8 +63,8 @@ __kernel void pm(__global uint *bits,
 			                                cE * deltaE + cW * deltaW));
 		}
 
-		rgba[3] = get_channel(bits[y + x * h], 3);
-		bits[y+x*h] = ((rgba[3] & 0xff) << 24) |
+		rgba[3] = get_channel(bits[x + y * w], 3);
+		bits[x + y * w] = ((rgba[3] & 0xff) << 24) |
 		              ((rgba[0] & 0xff) << 16) |
 		              ((rgba[1] & 0xff) << 8)  |
 		              (rgba[2] & 0xff);

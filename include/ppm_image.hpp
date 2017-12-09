@@ -23,7 +23,7 @@ public:
 	/*!
 		\exception std::invalid_argument
 	*/
-	static PPMImage load(std::string path);
+	static PPMImage load(const std::string& path);
 	static void save(const PPMImage &input, std::string path);
 	static PPMImage to_rgba(const PPMImage &input);
 	static PPMImage to_rgb(const PPMImage &input);

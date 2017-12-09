@@ -42,7 +42,7 @@ PPMImage &PPMImage::operator=(const PPMImage &other)
 	return *this;
 }
 
-PPMImage PPMImage::load(std::string path)
+PPMImage PPMImage::load(const std::string& path)
 {
 	std::string header;
 	int width, height, maxColor;
