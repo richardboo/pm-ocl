@@ -77,11 +77,6 @@ void  apply(img_data *, proc_data *);
 void  report(cl_platform_id, cl_device_id,
              int, int, int, double);
 //---------------------------------------------------------------
-// Экспериментальные функции
-//---------------------------------------------------------------
-void  binarization(img_data *, proc_data *);
-void  edges(img_data *, proc_data *);
-//---------------------------------------------------------------
 // Точка входа
 //---------------------------------------------------------------
 
@@ -539,108 +534,6 @@ void apply(img_data *idata, proc_data *pdata)
 				                            ((g & 0xff) << 8)  |
 				                            (b & 0xff);
 			}
-		}
-	}
-}
-
-//---------------------------------------------------------------
-// Экспериментальные функции
-//---------------------------------------------------------------
-
-void binarization(img_data *idata, proc_data *pdata)
-{
-	int tresh = 127;
-
-	for(int x = 0; x < idata->w; ++x) {
-		for(int y = 0; y < idata->h; ++y) {
-			int r = get_channel(idata->bits[y+x*idata->h], 0);
-			int g = get_channel(idata->bits[y+x*idata->h], 1);
-			int b = get_channel(idata->bits[y+x*idata->h], 2);
-			int gray = sqrt((r*r+g*g+b*b)/3.0);   // to b&w
-			int bin = gray >= tresh ? 255 : 0;    // binarization
-			bin = !bin ? 255 : 0;                 // inverted
-			int a = 1;
-			idata->bits[y+x*idata->h] = ((a & 0xff) << 24) |
-			                            ((bin & 0xff) << 16) |
-			                            ((bin & 0xff) << 8)  |
-			                            (bin & 0xff);
-		}
-	}
-}
-
-void bw(img_data *idata)
-{
-	for(int x = 0; x < idata->w; ++x) {
-		for(int y = 0; y < idata->h; ++y) {
-			int r = get_channel(idata->bits[y+x*idata->h], 0);
-			int g = get_channel(idata->bits[y+x*idata->h], 1);
-			int b = get_channel(idata->bits[y+x*idata->h], 2);
-			int a = get_channel(idata->bits[y+x*idata->h], 3);
-			int bw = sqrt((r*r+g*g+b*b)/3.0);
-			idata->bits[y+x*idata->h] = ((a & 0xff) << 24)  |
-			                            ((bw & 0xff) << 16) |
-			                            ((bw & 0xff) << 8)  |
-			                            (bw & 0xff);
-		}
-	}
-}
-
-void edges_laplacian(img_data *idata, proc_data *pdata)
-{
-	bw(idata);
-	float laplacian[3][3] = {{0, 1, 0},
-		{1, -4, 1},
-		{0, 1, 0}
-	};
-	int p, a;
-	float bw;
-
-	for(int x = 1; x < idata->w-1; ++x) {
-		for(int y = 1; y < idata->h-1; ++y) {
-			a = get_channel(idata->bits[y+x*idata->h], 3);
-			bw = 0.0f;
-
-			for(int i = 0; i < 3; ++i) {
-				for(int j = 0; j < 3; ++j) {
-					p = get_channel(idata->bits[(y+j) + (x+i) * idata->h], 0);
-					bw += p * (float)laplacian[i][j];
-				}
-			}
-
-			idata->bits[y+x*idata->h] = ((a & 0xff) << 24)  |
-			                            (((int)bw & 0xff) << 16) |
-			                            (((int)bw & 0xff) << 8)  |
-			                            ((int)bw & 0xff);
-		}
-	}
-}
-
-void edges(img_data *idata, proc_data *pdata)
-{
-	bw(idata);
-
-	for(int x = 1; x < idata->w-1; ++x) {
-		for(int y = 1; y < idata->h-1; ++y) {
-			int p = get_channel(idata->bits[y + x * idata->h], 0);
-			int deltaW = get_channel(idata->bits[y + (x-1) * idata->h], 0) - p;
-			int deltaE = get_channel(idata->bits[y + (x+1) * idata->h], 0) - p;
-			int deltaS = get_channel(idata->bits[y+1 + x * idata->h], 0) - p;
-			int deltaN = get_channel(idata->bits[y-1 + x * idata->h], 0) - p;
-			float cN = pdata->conduction_ptr(abs(deltaN), pdata->thresh);
-			float cS = pdata->conduction_ptr(abs(deltaS), pdata->thresh);
-			float cE = pdata->conduction_ptr(abs(deltaE), pdata->thresh);
-			float cW = pdata->conduction_ptr(abs(deltaW), pdata->thresh);
-			//std::cout << cN << " " << cS << " " << cE << " " << cW << std::endl;
-			p = (cN + cS + cW + cE) / 4.0 >= 0.7f ? 0 : 255.0;
-
-			if(p < 0) p = 0;
-
-			if(p > 255) p = 255;
-
-			idata->bits[y+x*idata->h] = ((1 & 0xff) << 24)  |
-			                            ((p & 0xff) << 16) |
-			                            ((p & 0xff) << 8)  |
-			                            (p & 0xff);
 		}
 	}
 }
