@@ -1,7 +1,8 @@
 /*!
-  \file
+  \file ocl_utils.cpp
   \brief Вспомогательные функции OpenCL
-  \author Илья Шошин, 2016
+  \author Ilya Shoshin (Galarius), 2016-2017
+  		  State Research Institute of Instrument Engineering 
 */
 
 #include "ocl_utils.hpp"

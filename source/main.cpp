@@ -1,10 +1,10 @@
 /*!
-  \file Perona Malic Anisotropic Diffusion
-  \author Илья Шошин (ГосНИИП, АПР), 2016
+  \file	main.cpp
+  \brief  GPU Powered Perona – Malik Anisotropic Filter
+  \author Ilya Shoshin (Galarius), 2016-2017
+  		  State Research Institute of Instrument Engineering 
 
   \note reference: https://people.eecs.berkeley.edu/~malik/papers/MP-aniso.pdf
-  \todo Сделать поддержку обработки изображений, где ширина != высоте.
-  \todo Исправить считывание параметров на windows.
 */
 
 #include <iostream> /* cout, setprecision, endl */
@@ -297,7 +297,12 @@ bool isArgOption(char **begin, char **end, const char *option)
 */
 void print_help()
 {
-	std::cout << "./pm source_file.ppm destination_file.ppm [-i -t -f -p -d -r -k]" << std::endl <<
+	std::cout << "GPU Powered Perona – Malik Anisotropic Filter" << std::endl <<
+			  "Ilya Shoshin (Galarius), 2016-2017" << std::endl <<
+  		  	  "State Research Institute of Instrument Engineering" << std::endl << std::endl <<
+	          "USAGE" << std::endl <<
+			  "-----" << std::endl << std::endl <<
+			  "./pm [-i -t -f -p -d -r -k] source_file.ppm destination_file.ppm" << std::endl <<
 	          "----------------------------------------------------------------" << std::endl <<
 	          "   -i <iterations>" << std::endl <<
 	          "   -t <conduction function threshold> ]" << std::endl <<
@@ -306,14 +311,15 @@ void print_help()
 	          "   -p <platform idx>"  << std::endl <<
 	          "   -d <device idx>"  << std::endl <<
 	          "   -r <run mode (0-sequential, 1-parallel {default}, 2-both )>"  << std::endl <<
-	          "   -k <kernel file (default:kernel.cl)>" << std::endl <<
+	          "   -k <kernel file (default:kernel.cl)>" << std::endl << std::endl <<
 	          "./pm [-pi -di -h]" << std::endl <<
 	          "-----------------" << std::endl <<
 	          "   -pi (shows platform list)"  << std::endl <<
 	          "   -di <platform index> (shows devices list)" << std::endl <<
-	          "   -h (help)" << std::endl <<
-	          "Example:" << std::endl <<
-	          "   ./pm images/in.ppm images/out.ppm -i 16 -t 30 -f 1"<< std::endl;
+	          "   -h (help)" << std::endl << std::endl <<
+	          "Example" << std::endl <<
+			  "-------" << std::endl <<
+	          "   ./pm -i 16 -t 30 -f 1 images/in.ppm images/out.ppm"<< std::endl;
 }
 //---------------------------------------------------------------
 // Параллельная фильтрация

@@ -1,6 +1,8 @@
 /*!
-  \file OpenCL Kernel
-  \author Илья Шошин (ГосНИИП, АПР), 2016
+  \file kernel.cl
+  \brief  OpenCL Kernel
+  \author Ilya Shoshin (Galarius), 2016-2017
+  		  State Research Institute of Instrument Engineering 
 */
 
 int get_channel(uint rgba, int channel)
