@@ -21,27 +21,27 @@ namespace OCLUtils
 			std::cerr << "No OpenCL platform found!" << std::endl;
 			exit(EXIT_FAILURE);
 		} else {
-			std::cout << "Found " << platform_id_count 
-					  << " platform(s)" << std::endl;
+			std::cout << "Found " << platform_id_count
+			          << " platform(s)" << std::endl;
 		}
 
 		std::vector<cl_platform_id> platform_ids(platform_id_count);
 		clGetPlatformIDs(platform_id_count, platform_ids.data(), nullptr);
 
 		for(cl_uint i = 0; i < platform_id_count; ++i) {
-			std::cout << "\t (" << (i) << ") : " 
-					  << platform_name(platform_ids[i]) << std::endl;
+			std::cout << "\t (" << (i) << ") : "
+			          << platform_name(platform_ids[i]) << std::endl;
 		}
 
-		if(recommended_id) 
+		if(recommended_id)
 			*recommended_id = 0;
 
 		return platform_ids;
 	}
 
-	std::vector<cl_device_id> available_devices(cl_platform_id platform_id, 
-												cl_uint *device_id_count, 
-												cl_uint *recommended_id)
+	std::vector<cl_device_id> available_devices(cl_platform_id platform_id,
+	        cl_uint *device_id_count,
+	        cl_uint *recommended_id)
 	{
 		cl_uint dev_id_count = 0;
 		clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_ALL, 0, nullptr, &dev_id_count);
@@ -61,10 +61,10 @@ namespace OCLUtils
 			std::cout << "\t (" << (i) << ") : " << device_name(device_list [i]) << std::endl;
 		}
 
-		if(device_id_count) 
+		if(device_id_count)
 			*device_id_count = dev_id_count;
 
-		if(recommended_id) 
+		if(recommended_id)
 			*recommended_id = dev_id_count > 1 ? 1 : 0;
 
 		return device_list;
@@ -76,8 +76,8 @@ namespace OCLUtils
 		size_t size = 0;
 		clGetPlatformInfo(id, CL_PLATFORM_NAME, 0, nullptr, &size);
 		result.resize(size);
-		clGetPlatformInfo(id, CL_PLATFORM_NAME, size, 
-						  const_cast<char *>(result.data()), nullptr);
+		clGetPlatformInfo(id, CL_PLATFORM_NAME, size,
+		                  const_cast<char *>(result.data()), nullptr);
 		return result;
 	}
 
@@ -97,7 +97,7 @@ namespace OCLUtils
 		std::ifstream in(name);
 		std::string result(
 		    (std::istreambuf_iterator<char> (in)),
-		     std::istreambuf_iterator<char> ());
+		    std::istreambuf_iterator<char> ());
 		return result;
 	}
 

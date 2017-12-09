@@ -1,5 +1,5 @@
 /*!
-  \file 
+  \file
   \brief PPM image io
   \author Илья Шошин, 2016
 */
@@ -42,7 +42,7 @@ PPMImage &PPMImage::operator=(const PPMImage &other)
 	return *this;
 }
 
-PPMImage PPMImage::load(const std::string& path)
+PPMImage PPMImage::load(const std::string &path)
 {
 	std::string header;
 	int width, height, maxColor;

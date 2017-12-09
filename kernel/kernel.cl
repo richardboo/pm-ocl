@@ -65,8 +65,8 @@ __kernel void pm(__global uint *bits,
 
 		rgba[3] = get_channel(bits[x + y * w], 3);
 		bits[x + y * w] = ((rgba[3] & 0xff) << 24) |
-		              ((rgba[0] & 0xff) << 16) |
-		              ((rgba[1] & 0xff) << 8)  |
-		              (rgba[2] & 0xff);
+		                  ((rgba[0] & 0xff) << 16) |
+		                  ((rgba[1] & 0xff) << 8)  |
+		                  (rgba[2] & 0xff);
 	}
 }

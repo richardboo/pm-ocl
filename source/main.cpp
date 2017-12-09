@@ -22,6 +22,15 @@
 */
 // #define ENABLE_PROFILER
 
+#define KernelArgumentBits 0
+#define KernelArgumentThresh 1
+#define KernelArgumentEvalFunc 2
+#define KernelArgumentLambda 3
+#define KernelArgumentWidth 4
+#define KernelArgumentHeight 5
+#define KernelArgumentOffsetX 6
+#define KernelArgumentOffsetY 7
+
 //---------------------------------------------------------------
 // Структуры, типы
 //---------------------------------------------------------------
@@ -156,7 +165,6 @@ int main(int argc, char *argv[])
 
 	char *src  = argv[argc - 2];   // входящее изображение
 	char *dest = argv[argc - 1];   // результат обработки
-
 	std::cout << "number of iterations: " << iterations << std::endl;
 	std::cout << "conduction function (0-quadric, 1-exponential): "
 	          << conduction_function << std::endl;
@@ -297,7 +305,7 @@ void print_help()
 	          "1-exponential [high-contrast edges over low-contrast])>"  << std::endl <<
 	          "   -p <platform idx>"  << std::endl <<
 	          "   -d <device idx>"  << std::endl <<
-	          "   -r <run mode (0-sequentional,1-parallel {default},2-both )>"  << std::endl <<
+	          "   -r <run mode (0-sequential, 1-parallel {default}, 2-both )>"  << std::endl <<
 	          "   -k <kernel file (default:kernel.cl)>" << std::endl <<
 	          "./pm [-pi -di -h]" << std::endl <<
 	          "-----------------" << std::endl <<
@@ -385,12 +393,12 @@ void run_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceI
 #endif // ENABLE_PROFILER
 	CheckOCLError(error);
 	/* установить параметры */
-	clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&bits);
-	clSetKernelArg(kernel, 1, sizeof(float), (void *)&pdata->thresh);
-	clSetKernelArg(kernel, 2, sizeof(float), (void *)&pdata->conduction_func);
-	clSetKernelArg(kernel, 3, sizeof(float), (void *)&pdata->lambda);
-	clSetKernelArg(kernel, 4, sizeof(int), (void *)&idata->w);
-	clSetKernelArg(kernel, 5, sizeof(int), (void *)&idata->h);
+	clSetKernelArg(kernel, KernelArgumentBits, sizeof(cl_mem), (void *)&bits);
+	clSetKernelArg(kernel, KernelArgumentThresh, sizeof(float), (void *)&pdata->thresh);
+	clSetKernelArg(kernel, KernelArgumentEvalFunc, sizeof(float), (void *)&pdata->conduction_func);
+	clSetKernelArg(kernel, KernelArgumentLambda, sizeof(float), (void *)&pdata->lambda);
+	clSetKernelArg(kernel, KernelArgumentWidth, sizeof(int), (void *)&idata->w);
+	clSetKernelArg(kernel, KernelArgumentHeight, sizeof(int), (void *)&idata->h);
 	cl_event event;
 	/* максимальный размер рабочей группы */
 	size_t max_work_group_size;
@@ -406,8 +414,8 @@ void run_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceI
 	if(idata->w <= max_work_group_size &&
 	        idata->h <= max_work_group_size) {
 		const int zero = 0;
-		clSetKernelArg(kernel, 6, sizeof(int), (void *)&zero);
-		clSetKernelArg(kernel, 7, sizeof(int), (void *)&zero);
+		clSetKernelArg(kernel, KernelArgumentOffsetX, sizeof(int), (void *)&zero);
+		clSetKernelArg(kernel, KernelArgumentOffsetY, sizeof(int), (void *)&zero);
 
 		for(int it = 0; it < pdata->iterations; ++it) {
 			/* все очередные операции завершены */
@@ -423,18 +431,18 @@ void run_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceI
 #endif // ENABLE_PROFILER
 		}
 	} else {
-		int partsX = ceil(idata->w / (float)max_work_group_size);
-		int partsY = ceil(idata->h / (float)max_work_group_size);
-		int offsetX = 0, offsetY = 0;
+		int parts_x = ceil(idata->w / (float)max_work_group_size);
+		int parts_y = ceil(idata->h / (float)max_work_group_size);
+		int offset_x = 0, offset_y = 0;
 
 		for(int it = 0; it < pdata->iterations; ++it) {
-			for(int py = 0; py < partsY; ++py) {
-				offsetY = py*work_size[1];
-				clSetKernelArg(kernel, 7, sizeof(int), (void *)&offsetY);
+			for(int py = 0; py < parts_y; ++py) {
+				offset_y = py*work_size[1];
+				clSetKernelArg(kernel, KernelArgumentOffsetY, sizeof(int), (void *)&offset_y);
 
-				for(int px = 0; px < partsX; ++px) {
-					offsetX = px*work_size[0];
-					clSetKernelArg(kernel, 6, sizeof(int), (void *)&offsetX);
+				for(int px = 0; px < parts_x; ++px) {
+					offset_x = px*work_size[0];
+					clSetKernelArg(kernel, KernelArgumentOffsetX, sizeof(int), (void *)&offset_x);
 					clFinish(queue);
 					CheckOCLError(clEnqueueNDRangeKernel(queue, kernel, 2,
 					                                     nullptr, work_size, nullptr, 0, nullptr, &event));
@@ -521,7 +529,8 @@ int apply_channel(img_data *idata, proc_data *pdata, int x, int y, int ch)
 
 void apply(img_data *idata, proc_data *pdata)
 {
-	std::cout << idata->w << " " << idata->h << "\n"; 
+	std::cout << idata->w << " " << idata->h << "\n";
+
 	for(int it = 0; it < pdata->iterations; ++it) {
 		for(int y = 1; y < idata->h-1; ++y) {
 			for(int x = 1; x < idata->w-1; ++x) {
