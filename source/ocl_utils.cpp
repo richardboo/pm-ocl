@@ -2,7 +2,7 @@
   \file ocl_utils.cpp
   \brief Вспомогательные функции OpenCL
   \author Ilya Shoshin (Galarius), 2016-2017
-  		  State Research Institute of Instrument Engineering 
+  		  State Research Institute of Instrument Engineering
 */
 
 #include "ocl_utils.hpp"
@@ -13,7 +13,7 @@
 
 namespace OCLUtils
 {
-	std::vector<cl_platform_id> available_platforms(cl_uint *recommended_id)
+	std::vector<cl_platform_id> availablePlatforms(cl_uint *recommended_id)
 	{
 		cl_uint platform_id_count = 0;
 		clGetPlatformIDs(0, nullptr, &platform_id_count);
@@ -31,7 +31,7 @@ namespace OCLUtils
 
 		for(cl_uint i = 0; i < platform_id_count; ++i) {
 			std::cout << "\t (" << (i) << ") : "
-			          << platform_name(platform_ids[i]) << std::endl;
+			          << platformName(platform_ids[i]) << std::endl;
 		}
 
 		if(recommended_id)
@@ -40,7 +40,7 @@ namespace OCLUtils
 		return platform_ids;
 	}
 
-	std::vector<cl_device_id> available_devices(cl_platform_id platform_id,
+	std::vector<cl_device_id> availableDevices(cl_platform_id platform_id,
 	        cl_uint *device_id_count,
 	        cl_uint *recommended_id)
 	{
@@ -59,7 +59,7 @@ namespace OCLUtils
 		               device_list.data(), nullptr);
 
 		for(cl_uint i = 0; i < dev_id_count; ++i) {
-			std::cout << "\t (" << (i) << ") : " << device_name(device_list [i]) << std::endl;
+			std::cout << "\t (" << (i) << ") : " << deviceName(device_list [i]) << std::endl;
 		}
 
 		if(device_id_count)
@@ -71,7 +71,7 @@ namespace OCLUtils
 		return device_list;
 	}
 
-	std::string platform_name(cl_platform_id id)
+	std::string platformName(cl_platform_id id)
 	{
 		std::string result;
 		size_t size = 0;
@@ -82,7 +82,7 @@ namespace OCLUtils
 		return result;
 	}
 
-	std::string device_name(cl_device_id id)
+	std::string deviceName(cl_device_id id)
 	{
 		std::string result;
 		size_t size = 0;
@@ -93,7 +93,7 @@ namespace OCLUtils
 		return result;
 	}
 
-	std::string load_kernel(const std::string &name)
+	std::string loadKernel(const std::string &name)
 	{
 		std::ifstream in(name);
 		std::string result(
@@ -102,7 +102,7 @@ namespace OCLUtils
 		return result;
 	}
 
-	cl_program create_program(const std::string &source, cl_context context)
+	cl_program createProgram(const std::string &source, cl_context context)
 	{
 		size_t lengths [1] = { source.size() };
 		const char *sources [1] = { source.data() };
@@ -112,16 +112,16 @@ namespace OCLUtils
 		return program;
 	}
 
-	bool build_program(cl_program program,
-	                   cl_uint device_id_count,
-	                   const cl_device_id *device_list)
+	bool buildProgram(cl_program program,
+	                  cl_uint device_id_count,
+	                  const cl_device_id *device_list)
 	{
 		cl_int err = clBuildProgram(program, device_id_count, device_list, nullptr, nullptr, nullptr);
 
 		/* вывод ошибок при наличии */
 		if(err == CL_BUILD_PROGRAM_FAILURE) {
 			for(cl_uint i = 0; i < device_id_count; ++i) {
-				std::cerr << device_name(device_list[i]) << ":" << std::endl;
+				std::cerr << deviceName(device_list[i]) << ":" << std::endl;
 				/* размер лога */
 				size_t log_size;
 				clGetProgramBuildInfo(program, device_list[i], CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
@@ -139,7 +139,7 @@ namespace OCLUtils
 		return true;
 	}
 
-	double mesuare_time_sec(cl_event &event)
+	double mesuareTimeSec(cl_event &event)
 	{
 		/* работы ядра завершена */
 		clWaitForEvents(1, &event);

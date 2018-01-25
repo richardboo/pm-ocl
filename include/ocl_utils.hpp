@@ -2,7 +2,7 @@
   \file ocl_utils.hpp
   \brief Вспомогательные функции OpenCL
   \author Ilya Shoshin (Galarius), 2016-2017
-  		  State Research Institute of Instrument Engineering 
+  		  State Research Institute of Instrument Engineering
 */
 
 #ifndef __OCL_UTILS__
@@ -40,34 +40,34 @@ namespace OCLUtils
 	    \param[out] recommended_id Рекомендуемая платформа
 	    \return Список платформ
 	*/
-	std::vector<cl_platform_id> available_platforms(cl_uint *recommended_id);
+	std::vector<cl_platform_id> availablePlatforms(cl_uint *recommended_id);
 	/*!
 	    \brief Получить список доступных устройств
-	    \param[in]  platform_id Платформа (см. available_platforms)
+	    \param[in]  platform_id Платформа (см. availablePlatforms)
 	    \param[out] device_id_count Количество устройств
 	    \param[out] recommended_id Рекомендуемое устройство
-	    \see available_platforms
+	    \see availablePlatforms
 	    \return Список устройств
 	*/
-	std::vector<cl_device_id> available_devices(cl_platform_id platform_id, cl_uint *device_id_count, cl_uint *recommended_id);
+	std::vector<cl_device_id> availableDevices(cl_platform_id platform_id, cl_uint *device_id_count, cl_uint *recommended_id);
 	/*!
 	    \brief Получить имя платформы по её идентификатору
 	    \param id Идентификатор платформы
-	    \see available_platforms
+	    \see availablePlatforms
 	*/
-	std::string platform_name(cl_platform_id id);
+	std::string platformName(cl_platform_id id);
 	/*!
 	    \brief Получить имя устройства по его идентификатору
 	    \param id Идентификатор устройства
-	    \see available_devices
+	    \see availableDevices
 	*/
-	std::string device_name(cl_device_id id);
+	std::string deviceName(cl_device_id id);
 	/*!
 	    \brief Загрузка kernel файлв
 	    \param name Имя kernel файла
 	    \return Текст программы
 	*/
-	std::string load_kernel(const std::string &name);
+	std::string loadKernel(const std::string &name);
 	/*!
 	    \brief Создать программный объект для указанного OpenCL контекста
 	           и исходного кода kernel файла
@@ -75,7 +75,7 @@ namespace OCLUtils
 	    \param context Open CL контекст
 	    \return Программный объект
 	*/
-	cl_program create_program(const std::string &source, cl_context context);
+	cl_program createProgram(const std::string &source, cl_context context);
 	/*!
 	    \brief Компиляция и линковка
 		\param program Программный объект
@@ -83,14 +83,14 @@ namespace OCLUtils
 	    \param device_list Указатель на список устройств для которых будет выполнена компиляция и линковка кода
 	    \return True, если успешное построение
 	*/
-	bool build_program(cl_program program,
-	                   cl_uint device_id_count,
-	                   const cl_device_id *device_list);
+	bool buildProgram(cl_program program,
+	                  cl_uint device_id_count,
+	                  const cl_device_id *device_list);
 
 	/*!
 	    \brief Оценка времени выполнения kernel в сек.
 	*/
-	double mesuare_time_sec(cl_event &event);
+	double mesuareTimeSec(cl_event &event);
 }
 
 #endif	// __OCL_UTILS__

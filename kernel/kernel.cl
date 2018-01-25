@@ -2,10 +2,10 @@
   \file kernel.cl
   \brief  OpenCL Kernel
   \author Ilya Shoshin (Galarius), 2016-2017
-  		  State Research Institute of Instrument Engineering 
+  		  State Research Institute of Instrument Engineering
 */
 
-int get_channel(uint rgba, int channel)
+int getChannel(uint rgba, int channel)
 {
 	switch(channel) {
 		case 0:
@@ -48,11 +48,11 @@ __kernel void pm(__global uint *bits,
 		uint rgba[4];
 
 		for(int ch = 0; ch < 3; ++ch) {
-			int p = get_channel(bits[x + y * w], ch);
-			int deltaW = get_channel(bits[x + (y-1) * w], ch) - p;
-			int deltaE = get_channel(bits[x + (y+1) * w], ch) - p;
-			int deltaS = get_channel(bits[x+1 + y * w], ch) - p;
-			int deltaN = get_channel(bits[x-1 + y * w], ch) - p;
+			int p = getChannel(bits[x + y * w], ch);
+			int deltaW = getChannel(bits[x + (y-1) * w], ch) - p;
+			int deltaE = getChannel(bits[x + (y+1) * w], ch) - p;
+			int deltaS = getChannel(bits[x+1 + y * w], ch) - p;
+			int deltaN = getChannel(bits[x-1 + y * w], ch) - p;
 			float cN = eval_func ? exponential(abs(deltaN), thresh)
 			           : quadric(abs(deltaN), thresh);
 			float cS = eval_func ? exponential(abs(deltaS), thresh)
@@ -65,7 +65,7 @@ __kernel void pm(__global uint *bits,
 			                                cE * deltaE + cW * deltaW));
 		}
 
-		rgba[3] = get_channel(bits[x + y * w], 3);
+		rgba[3] = getChannel(bits[x + y * w], 3);
 		bits[x + y * w] = ((rgba[3] & 0xff) << 24) |
 		                  ((rgba[0] & 0xff) << 16) |
 		                  ((rgba[1] & 0xff) << 8)  |

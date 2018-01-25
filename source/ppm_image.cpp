@@ -2,7 +2,7 @@
   \file ppm_image.cpp
   \brief PPM image io
   \author Ilya Shoshin (Galarius), 2016-2017
-  		  State Research Institute of Instrument Engineering 
+  		  State Research Institute of Instrument Engineering
 */
 
 #include "ppm_image.hpp"
@@ -95,7 +95,7 @@ void PPMImage::save(const PPMImage &input, std::string path)
 	out.close();
 }
 
-PPMImage PPMImage::to_rgba(const PPMImage &input)
+PPMImage PPMImage::toRGBA(const PPMImage &input)
 {
 	PPMImage result(input.width, input.height);
 
@@ -109,7 +109,7 @@ PPMImage PPMImage::to_rgba(const PPMImage &input)
 	return result;
 }
 
-PPMImage PPMImage::to_rgb(const PPMImage &input)
+PPMImage PPMImage::toRGB(const PPMImage &input)
 {
 	PPMImage result(input.width, input.height);
 
@@ -122,7 +122,7 @@ PPMImage PPMImage::to_rgb(const PPMImage &input)
 	return result;
 }
 
-int PPMImage::pack_data(unsigned int **packed)
+int PPMImage::packData(unsigned int **packed)
 {
 	*packed = new unsigned int[pixel.size() / 4];
 
@@ -137,7 +137,7 @@ int PPMImage::pack_data(unsigned int **packed)
 	return pixel.size() / 4;
 }
 
-void PPMImage::unpack_data(unsigned int *packed, int size)
+void PPMImage::unpackData(unsigned int *packed, int size)
 {
 	pixel.reserve(size * 4);
 

@@ -2,7 +2,7 @@
   \file	main.cpp
   \brief  GPU Powered Perona – Malik Anisotropic Filter
   \author Ilya Shoshin (Galarius), 2016-2017
-  		  State Research Institute of Instrument Engineering 
+  		  State Research Institute of Instrument Engineering
 
   \note reference: https://people.eecs.berkeley.edu/~malik/papers/MP-aniso.pdf
 */
@@ -76,12 +76,12 @@ typedef struct {
 //---------------------------------------------------------------
 char *getArgOption(char **, char **, const char *);
 bool isArgOption(char **, char **, const char *);
-void  print_help();
-void  run_parallel(img_data *, proc_data *, int, int, std::string);
-int   get_channel(uint, int);
+void  printHelp();
+void  runParallel(img_data *, proc_data *, int, int, std::string);
+int   getChannel(uint, int);
 float quadric(int, float);
 float exponential(int, float);
-int   apply_channel(img_data *, proc_data *, int, int, int);
+int   applyChannel(img_data *, proc_data *, int, int, int);
 void  apply(img_data *, proc_data *);
 void  report(cl_platform_id, cl_device_id,
              int, int, int, double);
@@ -103,26 +103,26 @@ int main(int argc, char *argv[])
 
 	/* считывание аргументов командной строки */
 	if(isArgOption(argv, argv + argc, "-h")) {  /* справка */
-		print_help();
+		printHelp();
 		exit(EXIT_SUCCESS); // -> EXIT_SUCCESS
 	}
 
 	if(isArgOption(argv, argv + argc, "-pi")) { /* список платформ */
 		/* получить доступные платформы */
-		OCLUtils::available_platforms(nullptr);
+		OCLUtils::availablePlatforms(nullptr);
 		exit(EXIT_SUCCESS); // -> EXIT_SUCCESS
 	}
 
 	char *dinfo_str = getArgOption(argv, argv + argc, "-di");   /* список устройств для платформы */
 
 	if(dinfo_str) {
-		/* получить доступplatformIdsные платформы */
-		std::vector<cl_platform_id> platformIds = OCLUtils::available_platforms(nullptr);
+		/* получить доступные платформы */
+		std::vector<cl_platform_id> platformIds = OCLUtils::availablePlatforms(nullptr);
 		int idx = atoi(dinfo_str);  // индекс выбранной платформы
 
 		if(idx >= 0 && idx < platformIds.size()) {
 			/* получить доступные устройства */
-			std::vector<cl_device_id> deviceIds = OCLUtils::available_devices(
+			std::vector<cl_device_id> deviceIds = OCLUtils::availableDevices(
 			        platformIds[idx], nullptr, nullptr);
 		}
 
@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
 
 	/* проверить количество аргументов командной строки */
 	if(argc < 3) {
-		print_help();
+		printHelp();
 		exit(EXIT_FAILURE);
 	}
 
@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
 	PPMImage input_img;
 
 	try {
-		input_img = PPMImage::to_rgba(PPMImage::load(src));
+		input_img = PPMImage::toRGBA(PPMImage::load(src));
 	} catch(std::invalid_argument e) {
 		std::cerr << e.what();
 		exit(EXIT_FAILURE);
@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
 
 	/* "Упаковка" rgba каналов в unsigned int */
 	unsigned int *packed_data = nullptr;
-	size_t packed_size = input_img.pack_data(&packed_data);
+	size_t packed_size = input_img.packData(&packed_data);
 	input_img.clear();
 	/* Данные изображения и параметры обработки */
 	img_data idata = { packed_data, packed_size,
@@ -212,8 +212,8 @@ int main(int argc, char *argv[])
 		apply(&idata, &pdata);  /* Запуск последовательной фильтрации */
 #endif // ENABLE_PROFILER
 		std::cout << "saving image..." << std::endl;
-		ouput_img.unpack_data(idata.bits, packed_size);
-		PPMImage::save(PPMImage::to_rgb(ouput_img), std::string(dest));
+		ouput_img.unpackData(idata.bits, packed_size);
+		PPMImage::save(PPMImage::toRGB(ouput_img), std::string(dest));
 		delete[] packed_data;
 		packed_data = nullptr;
 	}
@@ -221,14 +221,14 @@ int main(int argc, char *argv[])
 	//---------------------------------------------------------------------------------
 	if(run_mode == 1 || run_mode == 2) {    // Параллельная фильтрация
 		std::cout << "processing in parallel..." << std::endl;
-		input_img = PPMImage::to_rgba(PPMImage::load(src));
-		packed_size = input_img.pack_data(&packed_data);
+		input_img = PPMImage::toRGBA(PPMImage::load(src));
+		packed_size = input_img.packData(&packed_data);
 		input_img.clear();
 		/* Запуск параллельной фильтрации */
-		run_parallel(&idata, &pdata, platformId, deviceId, kernel_file);
+		runParallel(&idata, &pdata, platformId, deviceId, kernel_file);
 		std::cout << "saving image..." << std::endl;
-		ouput_img.unpack_data(idata.bits, packed_size);
-		PPMImage::save(PPMImage::to_rgb(ouput_img), std::string(dest));
+		ouput_img.unpackData(idata.bits, packed_size);
+		PPMImage::save(PPMImage::toRGB(ouput_img), std::string(dest));
 		delete[] packed_data;
 		packed_data = nullptr;
 	}
@@ -295,14 +295,14 @@ bool isArgOption(char **begin, char **end, const char *option)
 /*!
 * \brief Краткое руководство к запуску программы
 */
-void print_help()
+void printHelp()
 {
 	std::cout << "GPU Powered Perona – Malik Anisotropic Filter" << std::endl <<
-			  "Ilya Shoshin (Galarius), 2016-2017" << std::endl <<
-  		  	  "State Research Institute of Instrument Engineering" << std::endl << std::endl <<
+	          "Ilya Shoshin (Galarius), 2016-2017" << std::endl <<
+	          "State Research Institute of Instrument Engineering" << std::endl << std::endl <<
 	          "USAGE" << std::endl <<
-			  "-----" << std::endl << std::endl <<
-			  "./pm [-i -t -f -p -d -r -k] source_file.ppm destination_file.ppm" << std::endl <<
+	          "-----" << std::endl << std::endl <<
+	          "./pm [-i -t -f -p -d -r -k] source_file.ppm destination_file.ppm" << std::endl <<
 	          "----------------------------------------------------------------" << std::endl <<
 	          "   -i <iterations>" << std::endl <<
 	          "   -t <conduction function threshold> ]" << std::endl <<
@@ -318,7 +318,7 @@ void print_help()
 	          "   -di <platform index> (shows devices list)" << std::endl <<
 	          "   -h (help)" << std::endl << std::endl <<
 	          "Example" << std::endl <<
-			  "-------" << std::endl <<
+	          "-------" << std::endl <<
 	          "   ./pm -i 16 -t 30 -f 1 images/in.ppm images/out.ppm"<< std::endl;
 }
 //---------------------------------------------------------------
@@ -327,7 +327,7 @@ void print_help()
 /*!
 * Запуск параллельной фильтрации с помощью OpenCL
 */
-void run_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceId, std::string kernel_file)
+void runParallel(img_data *idata, proc_data *pdata, int platformId, int deviceId, std::string kernel_file)
 {
 	cl_uint recommendedPlatformId;
 	cl_uint recommendedDeviceId;
@@ -340,14 +340,14 @@ void run_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceI
 	cl_kernel kernel;
 	cl_command_queue queue;
 	/* получить доступные платформы */
-	platformIds = OCLUtils::available_platforms(&recommendedPlatformId);
+	platformIds = OCLUtils::availablePlatforms(&recommendedPlatformId);
 
 	if(platformId < 0 || platformId >= platformIds.size()) {
 		platformId = recommendedPlatformId;
 	}
 
 	/* получить доступные устройства */
-	deviceIds = OCLUtils::available_devices(
+	deviceIds = OCLUtils::availableDevices(
 	                platformIds[platformId], &deviceIdCount, &recommendedDeviceId);
 
 	if(deviceId < 0 || deviceId >= deviceIds.size()) {
@@ -367,11 +367,11 @@ void run_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceI
 	std::cout << "context created" << std::endl;
 	/* создать бинарник из кода программы */
 	std::cout << "kernel file: " << kernel_file << std::endl;
-	program = OCLUtils::create_program(
-	              OCLUtils::load_kernel(kernel_file), context);
+	program = OCLUtils::createProgram(
+	              OCLUtils::loadKernel(kernel_file), context);
 
 	/* скомпилировать программу */
-	if(!OCLUtils::build_program(program, deviceIdCount, deviceIds.data())) {
+	if(!OCLUtils::buildProgram(program, deviceIdCount, deviceIds.data())) {
 		exit(EXIT_FAILURE);
 	}
 
@@ -433,7 +433,7 @@ void run_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceI
 			                                     nullptr, &event));
 #ifdef ENABLE_PROFILER
 			/* получить данные профилирования по времени */
-			total_time = OCLUtils::mesuare_time_sec(event);
+			total_time = OCLUtils::mesuareTimeSec(event);
 #endif // ENABLE_PROFILER
 		}
 	} else {
@@ -454,7 +454,7 @@ void run_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceI
 					                                     nullptr, work_size, nullptr, 0, nullptr, &event));
 #ifdef ENABLE_PROFILER
 					/* получить данные профилирования по времени */
-					total_time += OCLUtils::mesuare_time_sec(event);
+					total_time += OCLUtils::mesuareTimeSec(event);
 #endif // ENABLE_PROFILER
 				}
 			}
@@ -481,8 +481,8 @@ void  report(cl_platform_id platformId, cl_device_id deviceId, int iterations, i
 	std::ofstream out("report.md", std::ios::out | std::ios::app);
 	out << "|platform & device | " << "iterations | " << "width x height, px | " << "time, ms |" << std::endl;
 	out << "|------------------|------------|--------------------|----------|" << std::endl;
-	out << " | " << OCLUtils::platform_name(platformId) << " " <<
-	    OCLUtils::device_name(deviceId)     << " | " <<
+	out << " | " << OCLUtils::platformName(platformId) << " " <<
+	    OCLUtils::deviceName(deviceId)     << " | " <<
 	    iterations << " | " << width << " x " << height << " | " <<
 	    std::fixed << std::setprecision(3) << time << " | ";
 	out.close();
@@ -492,7 +492,7 @@ void  report(cl_platform_id platformId, cl_device_id deviceId, int iterations, i
 // Последовательная фильтрация
 //---------------------------------------------------------------
 
-int get_channel(uint rgba, int channel)
+int getChannel(uint rgba, int channel)
 {
 	switch(channel) {
 		case 0:
@@ -519,13 +519,13 @@ float exponential(int norm, float thresh)
 	return exp(- norm * norm / (thresh * thresh));
 }
 
-int apply_channel(img_data *idata, proc_data *pdata, int x, int y, int ch)
+int applyChannel(img_data *idata, proc_data *pdata, int x, int y, int ch)
 {
-	int p = get_channel(idata->bits[x + y * idata->w], ch);
-	int deltaW = get_channel(idata->bits[x + (y-1) * idata->w], ch) - p;
-	int deltaE = get_channel(idata->bits[x + (y+1) * idata->w], ch) - p;
-	int deltaS = get_channel(idata->bits[x+1 + y * idata->w], ch) - p;
-	int deltaN = get_channel(idata->bits[x-1 + y * idata->w], ch) - p;
+	int p = getChannel(idata->bits[x + y * idata->w], ch);
+	int deltaW = getChannel(idata->bits[x + (y-1) * idata->w], ch) - p;
+	int deltaE = getChannel(idata->bits[x + (y+1) * idata->w], ch) - p;
+	int deltaS = getChannel(idata->bits[x+1 + y * idata->w], ch) - p;
+	int deltaN = getChannel(idata->bits[x-1 + y * idata->w], ch) - p;
 	float cN = pdata->conduction_ptr(abs(deltaN), pdata->thresh);
 	float cS = pdata->conduction_ptr(abs(deltaS), pdata->thresh);
 	float cE = pdata->conduction_ptr(abs(deltaE), pdata->thresh);
@@ -540,10 +540,10 @@ void apply(img_data *idata, proc_data *pdata)
 	for(int it = 0; it < pdata->iterations; ++it) {
 		for(int y = 1; y < idata->h-1; ++y) {
 			for(int x = 1; x < idata->w-1; ++x) {
-				int r = apply_channel(idata, pdata, x, y, 0);
-				int g = apply_channel(idata, pdata, x, y, 1);
-				int b = apply_channel(idata, pdata, x, y, 2);
-				int a = get_channel(idata->bits[x+y*idata->w], 3);
+				int r = applyChannel(idata, pdata, x, y, 0);
+				int g = applyChannel(idata, pdata, x, y, 1);
+				int b = applyChannel(idata, pdata, x, y, 2);
+				int a = getChannel(idata->bits[x+y*idata->w], 3);
 				idata->bits[x+y*idata->w] = ((a & 0xff) << 24) |
 				                            ((r & 0xff) << 16) |
 				                            ((g & 0xff) << 8)  |
