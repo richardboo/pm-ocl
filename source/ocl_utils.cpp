@@ -112,6 +112,19 @@ namespace OCLUtils
         return program;
     }
 
+    cl_program createProgramFromBitcode(const std::string &bitcode_path, cl_context context, cl_uint device_id_count, const cl_device_id *device_list) 
+    {
+        cl_int error = 0;
+        
+        const unsigned char* binaries[1] = { (unsigned char *)bitcode_path.c_str() };
+        const size_t len[1] = { bitcode_path.length() };
+        cl_program program = clCreateProgramWithBinary(context, 
+            device_id_count, device_list, len, binaries, NULL, &error);
+        CheckOCLError(error);
+
+        return program;
+    }
+
     bool buildProgram(cl_program program,
                       cl_uint device_id_count,
                       const cl_device_id *device_list)

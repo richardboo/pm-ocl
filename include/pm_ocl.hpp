@@ -17,6 +17,7 @@ extern "C" {
 /*!
 * Запуск параллельной фильтрации с помощью OpenCL
 */
-void pm_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceId, std::string kernel_file);
+void pm_parallel_kernel(img_data *idata, proc_data *pdata, int platformId, int deviceId, const std::string& kernel_file);
+void pm_parallel_bitcode(img_data *idata, proc_data *pdata, int platformId, int deviceId, const std::string& bitcodePath);
 
 #endif  /* __pm_ocl_hpp__ */

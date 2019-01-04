@@ -76,6 +76,14 @@ namespace OCLUtils
         \return Программный объект
     */
     cl_program createProgram(const std::string &source, cl_context context);
+        /*!
+        \brief Создать программный объект для указанного OpenCL контекста
+               и бит кода
+        \param bitcodePath путь к бит коду
+        \param context Open CL контекст
+        \return Программный объект
+    */
+    cl_program createProgramFromBitcode(const std::string &bitcode_path, cl_context context, cl_uint device_id_count, const cl_device_id *device_list); 
     /*!
         \brief Компиляция и линковка
     	\param program Программный объект

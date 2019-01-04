@@ -25,7 +25,7 @@
 /*!
 * Запуск параллельной фильтрации с помощью OpenCL
 */
-void pm_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceId, std::string kernel_file)
+static void pm_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceId, const std::string& path, bool bitcode)
 {
     cl_uint recommendedPlatformId;
     cl_uint recommendedDeviceId;
@@ -60,16 +60,23 @@ void pm_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceId
         reinterpret_cast<cl_context_properties>(platformIds[platformId]),
         0, 0
     };
-    context = clCreateContext(contextProperties, deviceIdCount, deviceIds.data(), nullptr, nullptr, &error);
+    cl_device_id selectedDeviceID[1] = {deviceIds[deviceId]};
+    context = clCreateContext(contextProperties, 1, selectedDeviceID, nullptr, nullptr, &error);
     CheckOCLError(error);
     std::cout << "context created" << std::endl;
-    /* создать бинарник из кода программы */
-    std::cout << "kernel file: " << kernel_file << std::endl;
-    program = OCLUtils::createProgram(
-                  OCLUtils::loadKernel(kernel_file), context);
+    if(bitcode) {
+        /* создать бинарник из бит кода */
+        std::cout << "bitcode file: " << path << std::endl;
+        program = OCLUtils::createProgramFromBitcode(path, context, 1, selectedDeviceID);
+    } else {
+        /* создать бинарник из кода программы */
+        std::cout << "kernel file: " << path << std::endl;
+        program = OCLUtils::createProgram(
+                    OCLUtils::loadKernel(path), context);
+    }
 
     /* скомпилировать программу */
-    if(!OCLUtils::buildProgram(program, deviceIdCount, deviceIds.data())) {
+    if(!OCLUtils::buildProgram(program, 1, selectedDeviceID)) {
         exit(EXIT_FAILURE);
     }
 
@@ -171,4 +178,14 @@ void pm_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceId
     clReleaseKernel(kernel);
     clReleaseProgram(program);
     clReleaseContext(context);
+}
+
+void pm_parallel_kernel(img_data *idata, proc_data *pdata, int platformId, int deviceId, const std::string& kernel_file)
+{
+    pm_parallel(idata, pdata, platformId, deviceId, kernel_file, false);
+}
+
+void pm_parallel_bitcode(img_data *idata, proc_data *pdata, int platformId, int deviceId, const std::string& bitcodePath)
+{
+    pm_parallel(idata, pdata, platformId, deviceId, bitcodePath, true);
 }

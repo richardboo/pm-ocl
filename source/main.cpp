@@ -44,7 +44,8 @@ int main(int argc, char *argv[])
     int platformId = -1;
     int deviceId = -1;
     int run_mode = 1;   /*[0,1,2]*/
-    std::string kernel_file = "../kernel/kernel.cl";
+    std::string kernel_file = "kernel.cl";
+    std::string bitcode_file;
 
     /* считывание аргументов командной строки */
     if(isArgOption(argv, argv + argc, "-h")) {  /* справка */
@@ -88,6 +89,7 @@ int main(int argc, char *argv[])
         char *device_str    = getArgOption(argv, argv + argc, "-d");        /* индекс устройства */
         char *rmode_str     = getArgOption(argv, argv + argc, "-r");        /* режим запуска [0,1,2] */
         char *kernel_file_str = getArgOption(argv, argv + argc, "-k");      /* файл с ядром программы*/
+        char *bitcode_file_str = getArgOption(argv, argv + argc, "-b");      /* файл с бит кодом*/
 
         if(iter_str) iterations = atoi(iter_str);
 
@@ -103,7 +105,30 @@ int main(int argc, char *argv[])
 
         if(run_mode < 0 || run_mode > 2) run_mode = 2;
 
-        if(kernel_file_str) kernel_file = std::string(kernel_file_str);
+        if(kernel_file_str) { 
+            kernel_file = std::string(kernel_file_str);
+            if(kernel_file.empty()) {
+                std::cerr << "Error: empty bitcode file.\n";
+                exit(EXIT_FAILURE);
+            }
+            std::ifstream in(kernel_file);
+            if(in.fail()) {
+                std::cerr << "Error: file " << kernel_file << "does not exist.\n";
+                exit(EXIT_FAILURE);
+            }
+        }
+        if(bitcode_file_str) { 
+            bitcode_file = std::string(bitcode_file_str);
+            if(bitcode_file.empty()) {
+                std::cerr << "Error: empty bitcode file.\n";
+                exit(EXIT_FAILURE);
+            }
+            std::ifstream in(bitcode_file);
+            if(in.fail()) {
+                std::cerr << "Error: file " << bitcode_file << "does not exist.\n";
+                exit(EXIT_FAILURE);
+            }
+        }
     } catch(...) {
         std::cerr << "failed to parse arguments, using defaults..." << std::endl;
     }
@@ -170,7 +195,12 @@ int main(int argc, char *argv[])
         packed_size = input_img.packData(&packed_data);
         input_img.clear();
         /* Запуск параллельной фильтрации */
-        pm_parallel(&idata, &pdata, platformId, deviceId, kernel_file);
+        if(bitcode_file.empty()) {
+            pm_parallel_kernel(&idata, &pdata, platformId, deviceId, kernel_file);
+        } else {
+            pm_parallel_bitcode(&idata, &pdata, platformId, deviceId, bitcode_file);
+
+        }
         std::cout << "saving image..." << std::endl;
         ouput_img.unpackData(idata.bits, packed_size);
 
@@ -253,7 +283,7 @@ void printHelp()
               "State Research Institute of Instrument Engineering" << std::endl << std::endl <<
               "USAGE" << std::endl <<
               "-----" << std::endl << std::endl <<
-              "./pm [-i -t -f -p -d -r -k] source_file.ppm destination_file.ppm" << std::endl <<
+              "./pm [-i -t -f -p -d -r -k -b] source_file.ppm destination_file.ppm" << std::endl <<
               "----------------------------------------------------------------" << std::endl <<
               "   -i <iterations>" << std::endl <<
               "   -t <conduction function threshold> ]" << std::endl <<
@@ -262,7 +292,8 @@ void printHelp()
               "   -p <platform idx>"  << std::endl <<
               "   -d <device idx>"  << std::endl <<
               "   -r <run mode (0-sequential, 1-parallel {default}, 2-both )>"  << std::endl <<
-              "   -k <kernel file (default:kernel.cl)>" << std::endl << std::endl <<
+              "   -k <kernel file (default:kernel.cl)>" << std::endl <<
+              "   -b <bitcode file>" << std::endl << std::endl <<
               "./pm [-pi -di -h]" << std::endl <<
               "-----------------" << std::endl <<
               "   -pi (shows platform list)"  << std::endl <<
