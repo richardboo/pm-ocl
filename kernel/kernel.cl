@@ -5,21 +5,22 @@
   		  State Research Institute of Instrument Engineering
 */
 
-int getChannel(uint rgba, int channel)
+#define PM_RED(rgb)     (( (rgb) >> 16) & 0xffu)
+#define PM_GREEN(rgb)   (( (rgb) >> 8 ) & 0xffu)
+#define PM_BLUE(rgb)    (  (rgb)        & 0xffu)
+#define PM_RGB(r, g, b) (0xffu << 24) | (( (r) & 0xffu) << 16) | (( (g) & 0xffu) << 8) | ( (b) & 0xffu)
+
+int getChannel(uint rgb, int channel)
 {
     switch(channel) {
         case 0:
-            return ((rgba >> 16) & 0xff);   // red
-
+            return PM_RED(rgb);
         case 1:
-            return ((rgba >> 8)  & 0xff);   // green
-
+            return PM_GREEN(rgb);
         case 2:
-            return (rgba & 0xff);           // blue
-
-        default:
-            return rgba >> 24;              // alpha
+            return PM_BLUE(rgb);
     }
+    return 0;
 }
 
 float quadric(int norm, float thresh)
@@ -45,7 +46,7 @@ __kernel void pm(__global uint *bits,
     const int y = offsetY + get_global_id(1);
 
     if(x < w && y < h) {
-        uint rgba[4];
+        uint rgb[3];
 
         for(int ch = 0; ch < 3; ++ch) {
             int p = getChannel(bits[x + y * w], ch);
@@ -61,14 +62,10 @@ __kernel void pm(__global uint *bits,
                        : quadric(abs(deltaE), thresh);
             float cW = eval_func ? exponential(abs(deltaW), thresh)
                        : quadric(abs(deltaW), thresh);
-            rgba[ch] = (uint)(p + lambda * (cN * deltaN + cS * deltaS +
-                                            cE * deltaE + cW * deltaW));
+            rgb[ch] = (uint)(p + lambda * (cN * deltaN + cS * deltaS +
+                                           cE * deltaE + cW * deltaW));
         }
 
-        rgba[3] = getChannel(bits[x + y * w], 3);
-        bits[x + y * w] = ((rgba[3] & 0xff) << 24) |
-                          ((rgba[0] & 0xff) << 16) |
-                          ((rgba[1] & 0xff) << 8)  |
-                          (rgba[2] & 0xff);
+        bits[x + y * w] = PM_RGB(rgb[0], rgb[1], rgb[2]);
     }
 }
