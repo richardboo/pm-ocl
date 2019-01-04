@@ -20,11 +20,14 @@ static int getChannel(uint rgb, int channel)
     switch(channel) {
         case 0:
             return PM_RED(rgb);
+
         case 1:
             return PM_GREEN(rgb);
+
         case 2:
             return PM_BLUE(rgb);
     }
+
     return 0;
 }
 
