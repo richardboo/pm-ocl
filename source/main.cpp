@@ -3,8 +3,6 @@
   \brief  GPU Powered Perona – Malik Anisotropic Filter
   \author Ilya Shoshin (Galarius), 2016-2017
   		  State Research Institute of Instrument Engineering
-
-  \note reference: https://people.eecs.berkeley.edu/~malik/papers/MP-aniso.pdf
 */
 
 #include <iostream> /* cout, setprecision, endl */
@@ -14,8 +12,11 @@
 #include <cmath>    /* exp */
 #include <ctime>    /* clock_t */
 
+extern "C" {
+	#include "pm.h"			 /* pm(...)	  */
+}
 #include "ppm_image.hpp" /* PPMImage  */
-#include "ocl_utils.hpp" /* OCLUtils */
+#include "ocl_utils.hpp" /* OCLUtils  */
 
 /* Раскомментировать, чтобы включить режим профилирования
    или использовать -D ENABLE_PROFILER в настройке компилятора
@@ -32,57 +33,12 @@
 #define KernelArgumentOffsetY 7
 
 //---------------------------------------------------------------
-// Структуры, типы
-//---------------------------------------------------------------
-typedef unsigned int uint;
-
-/*!
-*   \brief Указатель на функцию для вычисления
-*          коэффициента проводимости
-*/
-typedef float (*conduction)(int, float);
-
-typedef struct {
-	///@{
-	uint *bits;     ///< (упакованные rgba)
-	size_t size;    ///< размер bits
-	int w;          ///< ширина
-	int h;          ///< высота
-	///@}
-} img_data; ///< данные изображения
-
-typedef struct {
-	int iterations;         ///< кол-во итераций
-	/*!
-	* \brief Тип функции для вычисления
-	*        коэффициента проводимости
-	* \note варианты: 0,1
-	*/
-	int conduction_func;
-	/*!
-	* \brief Указатель на функцию для вычисления
-	*        коэффициента проводимости
-	*/
-	conduction conduction_ptr;
-	/*!
-	* \brief Пороговое значение для выделения
-	*        контуров в функции проводимости
-	*/
-	float thresh;
-	float lambda;   ///< коэффициент Лапласиана (стабильный = 0.25f)
-} proc_data; ///< параметры обработки
-//---------------------------------------------------------------
 // Прототипы
 //---------------------------------------------------------------
 char *getArgOption(char **, char **, const char *);
 bool isArgOption(char **, char **, const char *);
 void  printHelp();
 void  runParallel(img_data *, proc_data *, int, int, std::string);
-int   getChannel(uint, int);
-float quadric(int, float);
-float exponential(int, float);
-int   applyChannel(img_data *, proc_data *, int, int, int);
-void  apply(img_data *, proc_data *);
 void  report(cl_platform_id, cl_device_id,
              int, int, int, double);
 //---------------------------------------------------------------
@@ -193,7 +149,7 @@ int main(int argc, char *argv[])
 	                   input_img.width, input_img.height
 	                 };
 	/* Выбор функции для вычисления коэффициента проводимости */
-	conduction conduction_ptr = conduction_function ? &exponential : &quadric;
+	conduction conduction_ptr = conduction_function ? &pm_exponential : &pm_quadric;
 	proc_data pdata = {iterations, conduction_function, conduction_ptr, thresh, lambda};
 	/* Отфильтрованное изображение */
 	PPMImage ouput_img(idata.w, idata.h);
@@ -203,13 +159,13 @@ int main(int argc, char *argv[])
 		std::cout << "processing sequentially..." << std::endl;
 #ifdef ENABLE_PROFILER
 		clock_t start = clock();
-		apply(&idata, &pdata);  /* Запуск последовательной фильтрации */
+		pm(&idata, &pdata);  /* Запуск последовательной фильтрации */
 		clock_t end = clock();
 		double timeSpent = (end-start)/(double)CLOCKS_PER_SEC;
 		std::cout << "sequential execution time in milliseconds = " << std::fixed
 		          << std::setprecision(3) << (timeSpent * 1000.0) << " ms" << std::endl;
 #else
-		apply(&idata, &pdata);  /* Запуск последовательной фильтрации */
+		pm(&idata, &pdata);  /* Запуск последовательной фильтрации */
 #endif // ENABLE_PROFILER
 		std::cout << "saving image..." << std::endl;
 		ouput_img.unpackData(idata.bits, packed_size);
@@ -464,8 +420,8 @@ void runParallel(img_data *idata, proc_data *pdata, int platformId, int deviceId
 #ifdef ENABLE_PROFILER
 	std::cout << "parallel execution time in milliseconds = " << std::fixed
 	          << std::setprecision(3) << (total_time / 1000000.0) << " ms" << std::endl;
-#endif // ENABLE_PROFILER
 	report(platformIds[platformId], deviceIds[deviceId], pdata->iterations, idata->w, idata->h, total_time/1000000.0);
+#endif // ENABLE_PROFILER
 	/* считать результат */
 	CheckOCLError(clEnqueueReadBuffer(queue, bits, CL_TRUE, 0, idata->size * sizeof(uint), idata->bits, 0, nullptr, nullptr));
 	/* очистка */
@@ -486,69 +442,4 @@ void  report(cl_platform_id platformId, cl_device_id deviceId, int iterations, i
 	    iterations << " | " << width << " x " << height << " | " <<
 	    std::fixed << std::setprecision(3) << time << " | ";
 	out.close();
-}
-
-//---------------------------------------------------------------
-// Последовательная фильтрация
-//---------------------------------------------------------------
-
-int getChannel(uint rgba, int channel)
-{
-	switch(channel) {
-		case 0:
-			return ((rgba >> 16) & 0xff);   // red
-
-		case 1:
-			return ((rgba >> 8)  & 0xff);   // green
-
-		case 2:
-			return (rgba & 0xff);           // blue
-
-		default:
-			return rgba >> 24;             // alpha
-	}
-}
-
-float quadric(int norm, float thresh)
-{
-	return 1.0f / (1.0f + norm * norm / (thresh * thresh));
-}
-
-float exponential(int norm, float thresh)
-{
-	return exp(- norm * norm / (thresh * thresh));
-}
-
-int applyChannel(img_data *idata, proc_data *pdata, int x, int y, int ch)
-{
-	int p = getChannel(idata->bits[x + y * idata->w], ch);
-	int deltaW = getChannel(idata->bits[x + (y-1) * idata->w], ch) - p;
-	int deltaE = getChannel(idata->bits[x + (y+1) * idata->w], ch) - p;
-	int deltaS = getChannel(idata->bits[x+1 + y * idata->w], ch) - p;
-	int deltaN = getChannel(idata->bits[x-1 + y * idata->w], ch) - p;
-	float cN = pdata->conduction_ptr(abs(deltaN), pdata->thresh);
-	float cS = pdata->conduction_ptr(abs(deltaS), pdata->thresh);
-	float cE = pdata->conduction_ptr(abs(deltaE), pdata->thresh);
-	float cW = pdata->conduction_ptr(abs(deltaW), pdata->thresh);
-	return p + pdata->lambda * (cN * deltaN + cS * deltaS + cE * deltaE + cW * deltaW);
-}
-
-void apply(img_data *idata, proc_data *pdata)
-{
-	std::cout << idata->w << " " << idata->h << "\n";
-
-	for(int it = 0; it < pdata->iterations; ++it) {
-		for(int y = 1; y < idata->h-1; ++y) {
-			for(int x = 1; x < idata->w-1; ++x) {
-				int r = applyChannel(idata, pdata, x, y, 0);
-				int g = applyChannel(idata, pdata, x, y, 1);
-				int b = applyChannel(idata, pdata, x, y, 2);
-				int a = getChannel(idata->bits[x+y*idata->w], 3);
-				idata->bits[x+y*idata->w] = ((a & 0xff) << 24) |
-				                            ((r & 0xff) << 16) |
-				                            ((g & 0xff) << 8)  |
-				                            (b & 0xff);
-			}
-		}
-	}
 }

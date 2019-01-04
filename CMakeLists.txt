@@ -14,7 +14,7 @@ message ("cxx Flags:" ${CMAKE_CXX_FLAGS})
 message("List of compile features: ${CMAKE_CXX_COMPILE_FEATURES}")
 
 file (GLOB HEADERS "${PROJECT_SOURCE_DIR}/include/*.hpp")
-file (GLOB SOURCES "${PROJECT_SOURCE_DIR}/source/*.cpp")
+file (GLOB SOURCES "${PROJECT_SOURCE_DIR}/source/*.cpp" "${PROJECT_SOURCE_DIR}/source/*.c")
 file (GLOB KERNEL_SOURCES "${PROJECT_SOURCE_DIR}/kernel/*.cl")
 
 source_group("headers" FILES ${HEADERS})
@@ -22,6 +22,7 @@ source_group("sources" FILES ${SOURCES})
 source_group("kernels" FILES ${KERNEL_SOURCES})
 
 add_definitions(-DENABLE_PROFILER)
+add_definitions(-DCL_SILENCE_DEPRECATION)
 add_executable (pm ${HEADERS} ${SOURCES} ${KERNEL_SOURCES})
 
 # Properties->General->Output Directory
