@@ -2,7 +2,7 @@
 
 The implementation of Perona - Malik anisotropic smoothing filter on a GPU using OpenCL.
 
-| ![o](images/in.orig.s256.png) | ![p](images/out.gpu.s256.i16.t21.f1.png) |
+| ![o](assets/in.orig.s256.png) | ![p](assets/out.gpu.s256.i16.t21.f1.png) |
 | --- | --- |
 | Original | Filtered |
 
@@ -17,15 +17,16 @@ make
 ## Usage
 
 ```
-./pm [-i -t -f -p -d -r -k] source_file.ppm destination_file.ppm
+./pm [-i -t -f -p -d -r -k -b] source_file.ppm destination_file.ppm
 ----------------------------------------------------------------
    -i <iterations>
    -t <conduction function threshold> ]
    -f <conduction function (0-quadric [wide regions over smaller ones],1-exponential [high-contrast edges over low-contrast])>
    -p <platform idx>
    -d <device idx>
-   -r <run mode (0-sequentional,1-parallel {default},2-both )>
+   -r <run mode (0-sequential, 1-parallel {default}, 2-both )>
    -k <kernel file (default:kernel.cl)>
+   -b <bitcode file>
 
 ./pm [-pi -di -h]
 -----------------
@@ -35,7 +36,7 @@ make
 
 Example
 -------
-   ./pm -i 16 -t 30 -f 1 ../images/pict.ppm ../images/out.ppm
+   ./pm -i 16 -t 30 -f 1 images/in.ppm images/out.ppm
 ```
 
 ## Requirements
