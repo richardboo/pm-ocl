@@ -8,6 +8,8 @@ link_directories(${OpenCL_LIBRARY})
 
 # set the C++ standard to C++ 11
 set(CMAKE_CXX_STANDARD 11)
+# et(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g")
 
 # Print the list of known compile features for this version of CMake
 message ("cxx Flags:" ${CMAKE_CXX_FLAGS})
