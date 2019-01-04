@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
     try {
         input_img = PPMImage::toRGBA(PPMImage::load(src));
     } catch(std::invalid_argument e) {
-        std::cerr << e.what();
+        std::cerr << e.what() << std::endl;
         exit(EXIT_FAILURE);
     }
 
@@ -173,7 +173,13 @@ int main(int argc, char *argv[])
         pm_parallel(&idata, &pdata, platformId, deviceId, kernel_file);
         std::cout << "saving image..." << std::endl;
         ouput_img.unpackData(idata.bits, packed_size);
-        PPMImage::save(PPMImage::toRGB(ouput_img), std::string(dest));
+
+        try {
+            PPMImage::save(PPMImage::toRGB(ouput_img), std::string(dest));
+        } catch(std::invalid_argument e) {
+            std::cerr << e.what() << std::endl;
+        }
+        
         delete[] packed_data;
         packed_data = nullptr;
     }

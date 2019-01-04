@@ -48,10 +48,15 @@ PPMImage PPMImage::load(const std::string &path)
     std::string header;
     int width, height, maxColor;
     std::ifstream in (path, std::ios::binary);
+
+    if(in.fail()) {
+        throw std::invalid_argument("[ppm]: failed to load");
+    }
+
     in >> header;
 
     if(header != "P6") {
-        throw std::invalid_argument("wrong format");
+        throw std::invalid_argument("[ppm]: wrong format");
     }
 
     /* Пропустить комментарии */
@@ -72,7 +77,7 @@ PPMImage PPMImage::load(const std::string &path)
     in >> maxColor;
 
     if(maxColor != 255) {
-        throw std::invalid_argument("wrong format");
+        throw std::invalid_argument("[ppm]: wrong format");
     }
 
     // Пропустить пока не конец строки
@@ -88,6 +93,11 @@ PPMImage PPMImage::load(const std::string &path)
 void PPMImage::save(const PPMImage &input, std::string path)
 {
     std::ofstream out(path, std::ios::binary);
+
+    if(out.fail()) {
+        throw std::invalid_argument("[ppm]: failed to save");
+    }
+
     out << "P6\n";
     out << input.width << " " << input.height << "\n";
     out << "255\n";
