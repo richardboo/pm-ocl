@@ -12,17 +12,19 @@
 #include <cmath>    /* exp */
 #include <ctime>    /* clock_t */
 
+#define __CL_ENABLE_EXCEPTIONS 
+
+#if defined(__APPLE__) || defined(__MACOSX)
+    #include "cl.hpp"
+#else
+    #include <CL/cl.hpp>
+#endif
+
 extern "C" {
-#include "pm.h"			 /* pm(...)	  */
+    #include "pm.h"			 /* pm(...)	  */
 }
 #include "pm_ocl.hpp"
 #include "ppm_image.hpp" /* PPMImage  */
-#include "ocl_utils.hpp" /* OCLUtils  */
-
-/* Раскомментировать, чтобы включить режим профилирования
-   или использовать -D ENABLE_PROFILER в настройке компилятора
-*/
-// #define ENABLE_PROFILER
 
 //---------------------------------------------------------------
 // Прототипы
@@ -46,6 +48,8 @@ int main(int argc, char *argv[])
     int run_mode = 1;   /*[0,1,2]*/
     std::string kernel_file = "kernel.cl";
     std::string bitcode_file;
+    bool profile = isArgOption(argv, argv + argc, "-g");
+    bool verbose = isArgOption(argv, argv + argc, "-v");
 
     /* считывание аргументов командной строки */
     if(isArgOption(argv, argv + argc, "-h")) {  /* справка */
@@ -55,21 +59,62 @@ int main(int argc, char *argv[])
 
     if(isArgOption(argv, argv + argc, "-pi")) { /* список платформ */
         /* получить доступные платформы */
-        OCLUtils::availablePlatforms(nullptr);
+        try
+        {
+            std::vector<cl::Platform> platforms;
+            cl::Platform::get(&platforms);
+            if(platforms.size()) {
+                std::string pname;
+                std::cout << "Platforms: " << pname << std::endl;
+                int idx = 0;
+                for(auto p : platforms) {
+                    p.getInfo(CL_PLATFORM_NAME, &pname);
+                    std::cout << "\t" << idx << ". " << pname << std::endl;
+                    ++idx;
+                }
+            } else {
+                std::cerr << "No OpenCL platforms were found!\n";
+            }
+        } catch (cl::Error err) {
+            std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
+        }
+
         exit(EXIT_SUCCESS); // -> EXIT_SUCCESS
     }
 
     char *dinfo_str = getArgOption(argv, argv + argc, "-di");   /* список устройств для платформы */
 
     if(dinfo_str) {
-        /* получить доступные платформы */
-        std::vector<cl_platform_id> platformIds = OCLUtils::availablePlatforms(nullptr);
-        int idx = atoi(dinfo_str);  // индекс выбранной платформы
+        try
+        {
+            /* получить доступные платформы */
+            std::vector<cl::Platform> platforms;
+            cl::Platform::get(&platforms);
+            if(platforms.size()) {
+                int idx = atoi(dinfo_str);  // индекс выбранной платформы
+                if(idx >= 0 && idx < platforms.size()) {
+                    /* получить доступные устройства */
+                    std::vector<cl::Device> devices;
+                    platforms[idx].getDevices(CL_DEVICE_TYPE_ALL, &devices);
 
-        if(idx >= 0 && idx < platformIds.size()) {
-            /* получить доступные устройства */
-            std::vector<cl_device_id> deviceIds = OCLUtils::availableDevices(
-                    platformIds[idx], nullptr, nullptr);
+                    std::string pname, dname;
+                    platforms[idx].getInfo(CL_PLATFORM_NAME, &pname);
+                    std::cout << "Platform: " << pname << std::endl;
+                    if(devices.size()) {
+                        std::cout << "Devices: " << std::endl;
+                        int idx = 0;
+                        for(auto d : devices) {
+                            d.getInfo(CL_DEVICE_NAME, &dname);
+                            std::cout << "\t" << idx << ". " << dname << std::endl;
+                            ++idx;
+                        }
+                    } else {
+                        std::cerr << "No OpenCL devices were found!\n";
+                    }
+                }
+            }
+        } catch (cl::Error err) {
+            std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
         }
 
         exit(EXIT_SUCCESS); // -> EXIT_SUCCESS
@@ -135,13 +180,17 @@ int main(int argc, char *argv[])
 
     char *src  = argv[argc - 2];   // входящее изображение
     char *dest = argv[argc - 1];   // результат обработки
-    std::cout << "number of iterations: " << iterations << std::endl;
-    std::cout << "conduction function (0-quadric, 1-exponential): "
-              << conduction_function << std::endl;
-    std::cout << "conduction function threshold for edge enhancement: "
-              << thresh << std::endl;
-    std::cout << "run mode: " << run_mode << std::endl;
-    std::cout << "reading input image..." << std::endl;
+
+    if(verbose) {
+        std::cout << "number of iterations: " << iterations << std::endl;
+        std::cout << "conduction function (0-quadric, 1-exponential): "
+                << conduction_function << std::endl;
+        std::cout << "conduction function threshold for edge enhancement: "
+                << thresh << std::endl;
+        std::cout << "run mode: " << run_mode << std::endl;
+        std::cout << "reading input image..." << std::endl;
+    }
+
     /* Загрузка изображения (.ppm) */
     /* .ppm хранит rgb изображения, но алгоритм адаптировван
        для работы с rgba, поэтому выполним конвертацию  */
@@ -170,18 +219,24 @@ int main(int argc, char *argv[])
 
     //---------------------------------------------------------------------------------
     if(run_mode == 0 || run_mode == 2) {    // Последовательная фильтрация
-        std::cout << "processing sequentially..." << std::endl;
-#ifdef ENABLE_PROFILER
-        clock_t start = clock();
-        pm(&idata, &pdata);  /* Запуск последовательной фильтрации */
-        clock_t end = clock();
-        double timeSpent = (end-start)/(double)CLOCKS_PER_SEC;
-        std::cout << "sequential execution time in milliseconds = " << std::fixed
-                  << std::setprecision(3) << (timeSpent * 1000.0) << " ms" << std::endl;
-#else
-        pm(&idata, &pdata);  /* Запуск последовательной фильтрации */
-#endif // ENABLE_PROFILER
-        std::cout << "saving image..." << std::endl;
+        if(verbose) {
+           std::cout << "processing sequentially..." << std::endl;
+        }
+        
+        if(profile) {
+            clock_t start = clock();
+            pm(&idata, &pdata);  /* Запуск последовательной фильтрации */
+            clock_t end = clock();
+            double timeSpent = (end-start)/(double)CLOCKS_PER_SEC;
+            std::cout << "sequential execution time in milliseconds = " << std::fixed
+                    << std::setprecision(3) << (timeSpent * 1000.0) << " ms" << std::endl;
+        } else {
+            pm(&idata, &pdata);  /* Запуск последовательной фильтрации */
+        }
+
+        if(verbose) {
+            std::cout << "saving image..." << std::endl;
+        }
         ouput_img.unpackData(idata.bits, packed_size);
         PPMImage::save(PPMImage::toRGB(ouput_img), std::string(dest));
         delete[] packed_data;
@@ -190,24 +245,36 @@ int main(int argc, char *argv[])
 
     //---------------------------------------------------------------------------------
     if(run_mode == 1 || run_mode == 2) {    // Параллельная фильтрация
-        std::cout << "processing in parallel..." << std::endl;
+        if(verbose) {
+            std::cout << "processing in parallel..." << std::endl;
+        }
         input_img = PPMImage::toRGBA(PPMImage::load(src));
         packed_size = input_img.packData(&packed_data);
         input_img.clear();
         /* Запуск параллельной фильтрации */
-        if(bitcode_file.empty()) {
-            pm_parallel_kernel(&idata, &pdata, platformId, deviceId, kernel_file);
-        } else {
-            pm_parallel_bitcode(&idata, &pdata, platformId, deviceId, bitcode_file);
 
+        cl_data cdata = { platformId, deviceId, profile, kernel_file, false, verbose};
+
+        if(!bitcode_file.empty()) {
+            cdata.filename = bitcode_file;
+            cdata.bitcode = true;
         }
-        std::cout << "saving image..." << std::endl;
-        ouput_img.unpackData(idata.bits, packed_size);
 
-        try {
+        try
+        {
+            pm_parallel(&idata, &pdata, &cdata);
+            if(verbose) {
+                std::cout << "saving image..." << std::endl;
+            }
+            ouput_img.unpackData(idata.bits, packed_size);
             PPMImage::save(PPMImage::toRGB(ouput_img), std::string(dest));
+            
+        } catch (cl::Error err) {  
+            std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
         } catch(std::invalid_argument e) {
-            std::cerr << e.what() << std::endl;
+            std::cerr << e.what();
+        } catch(std::runtime_error e) {
+            std::cerr << e.what();
         }
         
         delete[] packed_data;
@@ -215,7 +282,9 @@ int main(int argc, char *argv[])
     }
 
     //---------------------------------------------------------------------------------
-    std::cout << "done\n" << std::endl;
+    if(verbose) {
+        std::cout << "done\n" << std::endl;
+    }
     return 0;
 }
 //---------------------------------------------------------------
@@ -283,7 +352,7 @@ void printHelp()
               "State Research Institute of Instrument Engineering" << std::endl << std::endl <<
               "USAGE" << std::endl <<
               "-----" << std::endl << std::endl <<
-              "./pm [-i -t -f -p -d -r -k -b] source_file.ppm destination_file.ppm" << std::endl <<
+              "./pm [-i -t -f -p -d -r -k -b -g -v] source_file.ppm destination_file.ppm" << std::endl <<
               "----------------------------------------------------------------" << std::endl <<
               "   -i <iterations>" << std::endl <<
               "   -t <conduction function threshold> ]" << std::endl <<
@@ -293,7 +362,9 @@ void printHelp()
               "   -d <device idx>"  << std::endl <<
               "   -r <run mode (0-sequential, 1-parallel {default}, 2-both )>"  << std::endl <<
               "   -k <kernel file (default:kernel.cl)>" << std::endl <<
-              "   -b <bitcode file>" << std::endl << std::endl <<
+              "   -b <bitcode file>" << std::endl <<
+              "   -g - profile" << std::endl <<
+              "   -v - verbose" << std::endl << std::endl <<
               "./pm [-pi -di -h]" << std::endl <<
               "-----------------" << std::endl <<
               "   -pi (shows platform list)"  << std::endl <<

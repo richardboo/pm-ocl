@@ -8,7 +8,7 @@ link_directories(${OpenCL_LIBRARY})
 
 # set the C++ standard to C++ 11
 set(CMAKE_CXX_STANDARD 11)
-# et(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
 # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0 -g")
 
 # Print the list of known compile features for this version of CMake
@@ -23,7 +23,6 @@ source_group("headers" FILES ${HEADERS})
 source_group("sources" FILES ${SOURCES})
 source_group("kernels" FILES ${KERNEL_SOURCES})
 
-add_definitions(-DENABLE_PROFILER)
 add_definitions(-DCL_SILENCE_DEPRECATION)
 add_executable (pm ${HEADERS} ${SOURCES} ${KERNEL_SOURCES})
 
