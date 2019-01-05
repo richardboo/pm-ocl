@@ -7,11 +7,17 @@
 
 #include "pm_ocl.hpp"
 
-#include "ocl_utils.hpp" /* OCLUtils  */
-
 #include <iostream>
+#include <fstream>
 #include <iomanip>  /* setprecision */
 #include <cmath>    /* ceil */
+
+//#define __CL_ENABLE_EXCEPTIONS 
+#if defined(__APPLE__) || defined(__MACOSX)
+    #include "cl.hpp"
+#else
+    #include <CL/cl.hpp>
+#endif
 
 #define KernelArgumentBits 0
 #define KernelArgumentThresh 1
@@ -22,70 +28,109 @@
 #define KernelArgumentOffsetX 6
 #define KernelArgumentOffsetY 7
 
+
+/*!
+    \def HandleCL
+    \brief Проверка на наличие ошибки после выполнения OpenCL функции
+    \param ret код, возвращённый OpenCL функцией
+*/
+#define HandleCL(ret)                   \
+    do                                  \
+    {                                   \
+        if ((ret) != CL_SUCCESS) {      \
+            std::cerr << "OpenCL call failed with code " << (ret) << std::endl; \
+            std::exit (ret);            \
+        }                               \
+    }while(false)                       \
+
 /*!
 * Запуск параллельной фильтрации с помощью OpenCL
 */
 static void pm_parallel(img_data *idata, proc_data *pdata, int platformId, int deviceId, const std::string& path, bool bitcode)
 {
-    cl_uint recommendedPlatformId;
-    cl_uint recommendedDeviceId;
-    cl_uint deviceIdCount;
-    std::vector<cl_platform_id> platformIds;
-    std::vector<cl_device_id> deviceIds;
-    cl_int error = CL_SUCCESS;
-    cl_context context;
-    cl_program program;
-    cl_kernel kernel;
-    cl_command_queue queue;
-    /* получить доступные платформы */
-    platformIds = OCLUtils::availablePlatforms(&recommendedPlatformId);
+    cl_int err = CL_SUCCESS;
 
-    if(platformId < 0 || platformId >= platformIds.size()) {
-        platformId = recommendedPlatformId;
+    /* получить доступные платформы */
+    std::vector<cl::Platform> platforms;
+    HandleCL(cl::Platform::get(&platforms));
+    if(!platforms.size()) {
+        std::cerr << "No OpenCL platforms were found!" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    
+    cl::Platform platform;
+    if(platformId >= 0 && platformId < platforms.size()) {
+        platform = platforms[platformId];
+    } else {
+        platform = platforms.front();
     }
 
     /* получить доступные устройства */
-    deviceIds = OCLUtils::availableDevices(
-                    platformIds[platformId], &deviceIdCount, &recommendedDeviceId);
-
-    if(deviceId < 0 || deviceId >= deviceIds.size()) {
-        deviceId = recommendedDeviceId;
-    }
-
-    std::cout << "selected platform: " << platformId << std::endl;
-    std::cout << "selected device: " << deviceId << std::endl;
-    /* создать контекст */
-    const cl_context_properties contextProperties[] = {
-        CL_CONTEXT_PLATFORM,
-        reinterpret_cast<cl_context_properties>(platformIds[platformId]),
-        0, 0
-    };
-    cl_device_id selectedDeviceID[1] = {deviceIds[deviceId]};
-    context = clCreateContext(contextProperties, 1, selectedDeviceID, nullptr, nullptr, &error);
-    CheckOCLError(error);
-    std::cout << "context created" << std::endl;
-    if(bitcode) {
-        /* создать бинарник из бит кода */
-        std::cout << "bitcode file: " << path << std::endl;
-        program = OCLUtils::createProgramFromBitcode(path, context, 1, selectedDeviceID);
-    } else {
-        /* создать бинарник из кода программы */
-        std::cout << "kernel file: " << path << std::endl;
-        program = OCLUtils::createProgram(
-                    OCLUtils::loadKernel(path), context);
-    }
-
-    /* скомпилировать программу */
-    if(!OCLUtils::buildProgram(program, 1, selectedDeviceID)) {
+    std::vector<cl::Device> devices;
+    HandleCL(platform.getDevices(CL_DEVICE_TYPE_ALL, &devices));
+    if(!devices.size()) {
+        std::cerr << "No OpenCL devices were found!" << std::endl;
         exit(EXIT_FAILURE);
     }
 
-    /* создать ядро */
-    kernel = clCreateKernel(program, "pm", &error);
-    CheckOCLError(error);
+    cl::Device device;
+    if(deviceId >= 0 && deviceId < devices.size()) {
+        device = devices[deviceId];
+    } else {
+        device = devices.front();
+    }
+    std::vector<cl::Device> ds { device };
+
+    std::string pname, dname;
+    HandleCL(platform.getInfo(CL_PLATFORM_NAME, &pname));
+    HandleCL(device.getInfo(CL_DEVICE_NAME, &dname));
+    std::cout << "Selected platform: " << pname << std::endl;
+    std::cout << "Selected device: "   << dname << std::endl;
+
+    /* создать контекст */
+    cl::Context context(ds, NULL, NULL, NULL, &err);
+    HandleCL(err);
+
+    /* создание программы */
+    cl::Program program;
+    if(bitcode) {
+        /* создать бинарник из бит кода */
+        std::cout << "bitcode file: " << path << std::endl;
+        auto binaries = cl::Program::Binaries {std::make_pair<const void*, ::size_t>(path.c_str(), path.length())};
+        std::vector<cl_int> binStatus;
+        program = cl::Program(context, ds, binaries, &binStatus, &err);
+        for(auto bs : binStatus) {
+            HandleCL(bs);
+        }
+        HandleCL(err);
+    } else {
+        /* создать бинарник из кода программы */
+        /* загрузить  исходный код */
+        std::ifstream in(path);
+        if(in.fail()) {
+            std::cerr << "Failed to load kernel source: " << path << std::endl;
+            exit(EXIT_FAILURE);
+        }
+        std::string source(
+            (std::istreambuf_iterator<char> (in)),
+             std::istreambuf_iterator<char> ());
+        in.close();
+        program = cl::Program(context, source, false, &err);
+        HandleCL(err);
+    }
+
+    /* скомпилировать и слинковать программу */
+    cl_int status = program.build(ds, NULL, NULL, NULL);
+    if(status == CL_BUILD_PROGRAM_FAILURE) {
+        std::string buildLog;
+        HandleCL(program.getBuildInfo(device, CL_PROGRAM_BUILD_LOG, &buildLog));
+        std::cerr << buildLog << std::endl;
+    }
+    HandleCL(status);
+    
     /* размер глобальной памяти */
     cl_ulong global_size;
-    CheckOCLError(clGetDeviceInfo(deviceIds[deviceId], CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &global_size, nullptr));
+    device.getInfo(CL_DEVICE_GLOBAL_MEM_SIZE, &global_size);
 
     if(global_size < idata->size * sizeof(uint)) {
         std::cerr << "image size is too large, max available memory size for device " << deviceId << " is " << global_size << std::endl;
@@ -93,53 +138,69 @@ static void pm_parallel(img_data *idata, proc_data *pdata, int platformId, int d
     }
 
     /* создать хранилище данных изображения (вход-выход) */
-    cl_mem bits = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, idata->size * sizeof(uint), idata->bits, &error);
-    CheckOCLError(error);
+    cl::Buffer bits(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, idata->size * sizeof(uint), idata->bits, &err);
+    HandleCL(err);
+
     /* создаем команду */
+    cl::CommandQueue queue;
+
 #ifdef ENABLE_PROFILER
     /* с профилированием */
-    queue = clCreateCommandQueue(context, deviceIds[deviceId], CL_QUEUE_PROFILING_ENABLE, &error);
+    queue = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, &err);    
 #else
-    queue = clCreateCommandQueue(context, deviceIds[deviceId], {0}, &error);
+    queue = cl::CommandQueue(context, device, 0, &err);
 #endif // ENABLE_PROFILER
-    CheckOCLError(error);
-    /* установить параметры */
-    clSetKernelArg(kernel, KernelArgumentBits, sizeof(cl_mem), (void *)&bits);
-    clSetKernelArg(kernel, KernelArgumentThresh, sizeof(float), (void *)&pdata->thresh);
-    clSetKernelArg(kernel, KernelArgumentEvalFunc, sizeof(float), (void *)&pdata->conduction_func);
-    clSetKernelArg(kernel, KernelArgumentLambda, sizeof(float), (void *)&pdata->lambda);
-    clSetKernelArg(kernel, KernelArgumentWidth, sizeof(int), (void *)&idata->w);
-    clSetKernelArg(kernel, KernelArgumentHeight, sizeof(int), (void *)&idata->h);
-    cl_event event;
+
+    HandleCL(err);
+
+    /* создать ядро */
+    cl::Kernel kernel(program, "pm", &err);
+    auto pmKernel = cl::make_kernel<cl::Buffer&, float, float, float, int, int, int, int>(kernel);
+    HandleCL(err);
+
     /* максимальный размер рабочей группы */
     size_t max_work_group_size;
-    CheckOCLError(clGetDeviceInfo(deviceIds[deviceId], CL_DEVICE_MAX_WORK_GROUP_SIZE,
-                                  sizeof(size_t), &max_work_group_size, nullptr));
+    HandleCL(device.getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE, &max_work_group_size));
     size_t work_group_x = std::min((size_t)idata->w, max_work_group_size);
     size_t work_group_y = std::min((size_t)idata->h, max_work_group_size);
-    std::size_t work_size [3] = { work_group_x, work_group_y, 1 };
-    std::cout << "work group size: " << work_size[0] << ", " << work_size[1] << std::endl;
+    std::cout << "work group size: " << work_group_x << ", " << work_group_y << std::endl;
     std::cout << "image size: " << idata->w << ", " << idata->h << std::endl;
+
+    cl::Event event;
+    cl::EnqueueArgs enqueueArgs(queue, cl::NDRange(work_group_x, work_group_y));
+
     double total_time = 0.0;
-
-    if(idata->w <= max_work_group_size &&
-            idata->h <= max_work_group_size) {
+    if(idata->w <= max_work_group_size && idata->h <= max_work_group_size) {
+        
         const int zero = 0;
-        clSetKernelArg(kernel, KernelArgumentOffsetX, sizeof(int), (void *)&zero);
-        clSetKernelArg(kernel, KernelArgumentOffsetY, sizeof(int), (void *)&zero);
-
+        HandleCL(kernel.setArg(KernelArgumentOffsetX, sizeof(int), (void *)&zero));
+        HandleCL(kernel.setArg(KernelArgumentOffsetY, sizeof(int), (void *)&zero));
         for(int it = 0; it < pdata->iterations; ++it) {
             /* все очередные операции завершены */
-            clFinish(queue);
-            /* выполнить ядро */
-            CheckOCLError(clEnqueueNDRangeKernel(queue, kernel, 2,
-                                                 nullptr, work_size,
-                                                 nullptr, 0,
-                                                 nullptr, &event));
-#ifdef ENABLE_PROFILER
-            /* получить данные профилирования по времени */
-            total_time = OCLUtils::mesuareTimeSec(event);
-#endif // ENABLE_PROFILER
+            queue.finish();
+
+            #ifdef ENABLE_PROFILER
+                HandleCL(kernel.setArg(KernelArgumentBits, sizeof(cl_mem), (void *)&bits));
+                HandleCL(kernel.setArg(KernelArgumentThresh, sizeof(float), (void *)&pdata->thresh));
+                HandleCL(kernel.setArg(KernelArgumentEvalFunc, sizeof(float), (void *)&pdata->conduction_func));
+                HandleCL(kernel.setArg(KernelArgumentLambda, sizeof(float), (void *)&pdata->lambda));
+                HandleCL(kernel.setArg(KernelArgumentWidth, sizeof(int), (void *)&idata->w));
+                HandleCL(kernel.setArg(KernelArgumentHeight, sizeof(int), (void *)&idata->h));
+                HandleCL(kernel.setArg(KernelArgumentWidth, sizeof(int), (void *)&idata->w));
+                HandleCL(kernel.setArg(KernelArgumentHeight, sizeof(int), (void *)&idata->h));
+
+                HandleCL(queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(work_group_x, work_group_y), cl::NullRange, NULL, &event));
+                /* получить данные профилирования по времени */
+                event.wait();
+                /* получить данные профилирования по времени */
+                cl_ulong time_start, time_end;
+                HandleCL(event.getProfilingInfo(CL_PROFILING_COMMAND_START, &time_start));
+                HandleCL(event.getProfilingInfo(CL_PROFILING_COMMAND_END, &time_end));
+                total_time += (time_end - time_start);
+            #else
+                /* выполнить ядро */
+                pmKernel(enqueueArgs, bits, pdata->thresh, pdata->conduction_func, pdata->lambda, idata->w, idata->h, zero, zero);
+            #endif // ENABLE_PROFILER
         }
     } else {
         int parts_x = ceil(idata->w / (float)max_work_group_size);
@@ -148,36 +209,48 @@ static void pm_parallel(img_data *idata, proc_data *pdata, int platformId, int d
 
         for(int it = 0; it < pdata->iterations; ++it) {
             for(int py = 0; py < parts_y; ++py) {
-                offset_y = py*work_size[1];
-                clSetKernelArg(kernel, KernelArgumentOffsetY, sizeof(int), (void *)&offset_y);
-
+                offset_y = py*work_group_y;
                 for(int px = 0; px < parts_x; ++px) {
-                    offset_x = px*work_size[0];
-                    clSetKernelArg(kernel, KernelArgumentOffsetX, sizeof(int), (void *)&offset_x);
-                    clFinish(queue);
-                    CheckOCLError(clEnqueueNDRangeKernel(queue, kernel, 2,
-                                                         nullptr, work_size, nullptr, 0, nullptr, &event));
-#ifdef ENABLE_PROFILER
-                    /* получить данные профилирования по времени */
-                    total_time += OCLUtils::mesuareTimeSec(event);
-#endif // ENABLE_PROFILER
+                    offset_x = px*work_group_x;
+                    /* все очередные операции завершены */
+                    queue.finish();
+                    
+                    #ifdef ENABLE_PROFILER
+                        HandleCL(kernel.setArg(KernelArgumentBits, sizeof(cl_mem), (void *)&bits));
+                        HandleCL(kernel.setArg(KernelArgumentThresh, sizeof(float), (void *)&pdata->thresh));
+                        HandleCL(kernel.setArg(KernelArgumentEvalFunc, sizeof(float), (void *)&pdata->conduction_func));
+                        HandleCL(kernel.setArg(KernelArgumentLambda, sizeof(float), (void *)&pdata->lambda));
+                        HandleCL(kernel.setArg(KernelArgumentWidth, sizeof(int), (void *)&idata->w));
+                        HandleCL(kernel.setArg(KernelArgumentHeight, sizeof(int), (void *)&idata->h));
+                        HandleCL(kernel.setArg(KernelArgumentWidth, sizeof(int), (void *)&idata->w));
+                        HandleCL(kernel.setArg(KernelArgumentHeight, sizeof(int), (void *)&idata->h));
+                        HandleCL(kernel.setArg(KernelArgumentOffsetX, sizeof(int), (void *)&offset_x));
+                        HandleCL(kernel.setArg(KernelArgumentOffsetY, sizeof(int), (void *)&offset_y));
+
+                        HandleCL(queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(work_group_x, work_group_y), cl::NullRange, NULL, &event));
+                        /* получить данные профилирования по времени */
+                        event.wait();
+                        /* получить данные профилирования по времени */
+                        cl_ulong time_start, time_end;
+                        HandleCL(event.getProfilingInfo(CL_PROFILING_COMMAND_START, &time_start));
+                        HandleCL(event.getProfilingInfo(CL_PROFILING_COMMAND_END, &time_end));
+                        total_time += (time_end - time_start);
+                    #else
+                    /* выполнить ядро */
+                        pmKernel(enqueueArgs, bits, pdata->thresh, pdata->conduction_func, pdata->lambda, idata->w, idata->h, offset_x, offset_y);
+                    #endif // ENABLE_PROFILER
                 }
             }
         }
     }
 
-#ifdef ENABLE_PROFILER
-    std::cout << "parallel execution time in milliseconds = " << std::fixed
+    #ifdef ENABLE_PROFILER
+        std::cout << "parallel execution time in milliseconds = " << std::fixed
               << std::setprecision(3) << (total_time / 1000000.0) << " ms" << std::endl;
-#endif // ENABLE_PROFILER
-    /* считать результат */
-    CheckOCLError(clEnqueueReadBuffer(queue, bits, CL_TRUE, 0, idata->size * sizeof(uint), idata->bits, 0, nullptr, nullptr));
-    /* очистка */
-    clReleaseMemObject(bits);
-    clReleaseCommandQueue(queue);
-    clReleaseKernel(kernel);
-    clReleaseProgram(program);
-    clReleaseContext(context);
+    #endif // ENABLE_PROFILER
+
+    /* считать результат */    
+    HandleCL(queue.enqueueReadBuffer(bits, CL_TRUE, 0, idata->size * sizeof(uint), idata->bits, nullptr, nullptr));
 }
 
 void pm_parallel_kernel(img_data *idata, proc_data *pdata, int platformId, int deviceId, const std::string& kernel_file)
