@@ -136,10 +136,10 @@ void pm_parallel(img_data *idata, proc_data *pdata, cl_data *cdata)
         std::string pname, dname;
         platform.getInfo(CL_PLATFORM_NAME, &pname);
         device.getInfo(CL_DEVICE_NAME, &dname);
-        std::cout << "Selected platform: " << pname << std::endl;
-        std::cout << "Selected device: "   << dname << std::endl;
-        std::cout << "Work group size: " << work_group_x << ", " << work_group_y << std::endl;
-        std::cout << "mage size: " << idata->w << ", " << idata->h << std::endl;
+        std::cout << "selected platform: " << pname << std::endl;
+        std::cout << "selected device: "   << dname << std::endl;
+        std::cout << "work group size: " << work_group_x << ", " << work_group_y << std::endl;
+        std::cout << "image size: " << idata->w << ", " << idata->h << std::endl;
     }
 
     cl::NDRange workGroup(work_group_x, work_group_y);
