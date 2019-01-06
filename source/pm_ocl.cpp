@@ -67,7 +67,6 @@ void pm_parallel(img_data *idata, proc_data *pdata, cl_data *cdata)
         platform = platforms[cdata->platformId];
     } else {
         platform = platforms.front();
-        cdata->platformId = 0;
     }
 
     /* получить доступные устройства */
@@ -84,8 +83,15 @@ void pm_parallel(img_data *idata, proc_data *pdata, cl_data *cdata)
     if(cdata->deviceId >= 0 && cdata->deviceId < devices.size()) {
         device = devices[cdata->deviceId];
     } else {
-        device = devices.front();
-        cdata->deviceId = 0;
+        std::vector<size_t> max_work_item_size = {0, 0, 0};
+        std::vector<size_t> dev_work_item_size;
+        for(auto d : devices) {
+            d.getInfo(CL_DEVICE_MAX_WORK_ITEM_SIZES, &dev_work_item_size);
+            if(dev_work_item_size[1] > max_work_item_size[1]) {
+                max_work_item_size = dev_work_item_size;
+                device = d;
+            }
+        }
     }
 
     std::vector<cl::Device> ds { device };
@@ -122,9 +128,9 @@ void pm_parallel(img_data *idata, proc_data *pdata, cl_data *cdata)
     cl_int status = program.build(ds);
 
     if(status == CL_BUILD_PROGRAM_FAILURE) {
-        std::string buildLog;
-        program.getBuildInfo(device, CL_PROGRAM_BUILD_LOG, &buildLog);
-        std::cerr << buildLog << std::endl;
+        std::string build_log;
+        program.getBuildInfo(device, CL_PROGRAM_BUILD_LOG, &build_log);
+        std::cerr << build_log << std::endl;
     }
 
     /* получить размер глобальной памяти */
@@ -133,8 +139,10 @@ void pm_parallel(img_data *idata, proc_data *pdata, cl_data *cdata)
 
     if(global_size < idata->size * sizeof(uint)) {
         std::stringstream ss;
+        std::string dname;
+        device.getInfo(CL_DEVICE_NAME, &dname);
         ss << "Image size is too large, max available memory size for device "
-           << cdata->deviceId << " is " << global_size << std::endl;
+           << dname << " is " << global_size << std::endl;
         throw std::runtime_error(ss.str());
     }
 
