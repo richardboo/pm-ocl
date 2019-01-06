@@ -33,7 +33,7 @@ namespace
         cl::Event event;
         kernel.setArg(0, sizeof(cl::Buffer), (void *)&bits);
         kernel.setArg(1, sizeof(float), (void *)&pdata->thresh);
-        kernel.setArg(2, sizeof(float), (void *)&pdata->conduction_func);
+        kernel.setArg(2, sizeof(int  ), (void *)&pdata->conduction_func);
         kernel.setArg(3, sizeof(float), (void *)&pdata->lambda);
         kernel.setArg(4, sizeof(int), (void *)&idata->w);
         kernel.setArg(5, sizeof(int), (void *)&idata->h);
@@ -150,7 +150,7 @@ void pm_parallel(img_data *idata, proc_data *pdata, cl_data *cdata)
     cl::Buffer bits(context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR, idata->size * sizeof(uint), idata->bits);
     /* создать ядро */
     cl::Kernel kernel(program, "pm");
-    auto pmKernel = cl::make_kernel<cl::Buffer &, float, float, float, int, int, int, int>(kernel);
+    auto pmKernel = cl::make_kernel<cl::Buffer &, float, int, float, int, int, int, int>(kernel);
     /* максимальный размер рабочей группы */
     size_t max_work_group_size;
     device.getInfo(CL_DEVICE_MAX_WORK_GROUP_SIZE, &max_work_group_size);

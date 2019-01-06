@@ -35,7 +35,7 @@ float exponential(int norm, float thresh)
 
 __kernel void pm(__global uint *bits,
                  __private float thresh,
-                 __private float eval_func,
+                 __private int  eval_func,
                  __private float lambda,
                  __private int w,
                  __private int h,
