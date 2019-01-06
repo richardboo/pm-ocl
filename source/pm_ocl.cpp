@@ -191,7 +191,4 @@ void pm_parallel(img_data *idata, proc_data *pdata, cl_data *cdata)
         std::cout << "parallel execution time in milliseconds = " << std::fixed
                   << std::setprecision(3) << (total_time / 1000000.0) << " ms" << std::endl;
     }
-
-    /* считать результат фильтрации */
-    queue.enqueueReadBuffer(bits, CL_TRUE, 0, idata->size * sizeof(uint), idata->bits, nullptr, nullptr);
 }
