@@ -19,10 +19,10 @@ typedef float (*conduction)(int, float);
 
 typedef struct {
     /*!\{*/
-    uint *bits; /*!< (упакованные rgba) */
-    ulong size;  /*!< размер bits        */
-    int w;      /*!< ширина             */
-    int h;      /*!< высота             */
+    uint *bits; /*!< (упакованные rgba)    */
+    ulong size;  /*!< размер bits (кол-во) */
+    int w;      /*!< ширина                */
+    int h;      /*!< высота                */
     /*!\}*/
 } img_data; /*!< данные изображения     */
 
