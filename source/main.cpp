@@ -197,7 +197,7 @@ int main(int argc, char *argv[])
     PPMImage input_img;
 
     try {
-        input_img = PPMImage::toRGBA(PPMImage::load(src));
+        input_img = PPMImage::toRGB(PPMImage::load(src));
     } catch(std::invalid_argument e) {
         std::cerr << e.what() << std::endl;
         exit(EXIT_FAILURE);
@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
         if(verbose) {
             std::cout << "processing in parallel..." << std::endl;
         }
-        input_img = PPMImage::toRGBA(PPMImage::load(src));
+        input_img = PPMImage::toRGB(PPMImage::load(src));
         packed_size = input_img.packData(&packed_data);
         input_img.clear();
         /* Запуск параллельной фильтрации */

@@ -105,25 +105,11 @@ void PPMImage::save(const PPMImage &input, std::string path)
     out.close();
 }
 
-PPMImage PPMImage::toRGBA(const PPMImage &input)
-{
-    PPMImage result(input.width, input.height);
-
-    for(std::size_t i = 0; i < input.pixel.size(); i += 3) {
-        result.pixel.push_back(input.pixel [i + 0]);
-        result.pixel.push_back(input.pixel [i + 1]);
-        result.pixel.push_back(input.pixel [i + 2]);
-        result.pixel.push_back(0);
-    }
-
-    return result;
-}
-
 PPMImage PPMImage::toRGB(const PPMImage &input)
 {
     PPMImage result(input.width, input.height);
 
-    for(std::size_t i = 0; i < input.pixel.size(); i += 4) {
+    for(std::size_t i = 0; i < input.pixel.size(); i += 3) {
         result.pixel.push_back(input.pixel [i + 0]);
         result.pixel.push_back(input.pixel [i + 1]);
         result.pixel.push_back(input.pixel [i + 2]);
@@ -134,33 +120,30 @@ PPMImage PPMImage::toRGB(const PPMImage &input)
 
 int PPMImage::packData(unsigned int **packed)
 {
-    *packed = new unsigned int[pixel.size() / 4];
+    *packed = new unsigned int[pixel.size() / 3];
 
-    for(int i = 0, j = 0; i < pixel.size(); i+=4, ++j) {
+    for(int i = 0, j = 0; i < pixel.size(); i += 3, ++j) {
         int r = (int)pixel[i+0];
         int g = (int)pixel[i+1];
         int b = (int)pixel[i+2];
-        int a = (int)pixel[i+3];
-        (*packed)[j] = ((a & 0xff) << 24) | ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
+        (*packed)[j] = (0xffu << 24) | (( r & 0xffu) << 16) | (( g & 0xffu) << 8) | ( b & 0xffu);
     }
 
-    return pixel.size() / 4;
+    return pixel.size() / 3;
 }
 
 void PPMImage::unpackData(unsigned int *packed, int size)
 {
-    pixel.reserve(size * 4);
+    pixel.reserve(size * 3);
 
     for(int i = 0; i < size; ++i) {
         int rgba = packed[i];
         int r = ((rgba >> 16) & 0xff);   // red
         int g = ((rgba >> 8)  & 0xff);   // green
         int b = (rgba & 0xff);           // blue
-        int a = rgba >> 24;              // alpha
         pixel.push_back((char)r);
         pixel.push_back((char)g);
         pixel.push_back((char)b);
-        pixel.push_back((char)a);
     }
 }
 

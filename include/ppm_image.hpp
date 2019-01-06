@@ -22,11 +22,10 @@ public:
     PPMImage &operator=(const PPMImage &other);
 public:
     /*!
-    	\exception std::invalid_argument
-    */
+     * \throws std::invalid_argument
+     */
     static PPMImage load(const std::string &path);
     static void save(const PPMImage &input, std::string path);
-    static PPMImage toRGBA(const PPMImage &input);
     static PPMImage toRGB(const PPMImage &input);
     int packData(unsigned int **packed);
     void unpackData(unsigned int *packed, int size);
