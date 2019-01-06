@@ -13,7 +13,7 @@
 #define PM_RED(rgb)     (( (rgb) >> 16) & 0xffu)
 #define PM_GREEN(rgb)   (( (rgb) >> 8 ) & 0xffu)
 #define PM_BLUE(rgb)    (  (rgb)        & 0xffu)
-#define PM_RGB(r, g, b) (0xffu << 24) | (( (r) & 0xffu) << 16) | (( (g) & 0xffu) << 8) | ( (b) & 0xffu)
+#define PM_RGB(r, g, b) (( (r) & 0xffu) << 16) | (( (g) & 0xffu) << 8) | ( (b) & 0xffu)
 
 static int getChannel(uint rgb, int channel)
 {

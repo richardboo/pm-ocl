@@ -126,7 +126,7 @@ int PPMImage::packData(unsigned int **packed)
         int r = (int)pixel[i+0];
         int g = (int)pixel[i+1];
         int b = (int)pixel[i+2];
-        (*packed)[j] = (0xffu << 24) | (( r & 0xffu) << 16) | (( g & 0xffu) << 8) | ( b & 0xffu);
+        (*packed)[j] = (( r & 0xffu) << 16) | (( g & 0xffu) << 8) | ( b & 0xffu);
     }
 
     return pixel.size() / 3;
