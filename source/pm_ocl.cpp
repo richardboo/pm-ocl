@@ -13,6 +13,7 @@
 #include <iomanip>      // setprecision
 #include <cmath>        // ceil
 #include <stdexcept>    // std::runtime_error, std::invalid_argument
+#include <algorithm>	// std::min
 
 #define __CL_ENABLE_EXCEPTIONS
 
@@ -21,33 +22,6 @@
 #else
     #include <CL/cl.hpp>
 #endif
-
-namespace
-{
-    /*!
-     * Запуск в режиме профилирования
-     * \return Время выполнения
-     */
-    double profileKernel(cl::Kernel &kernel, cl::CommandQueue &queue, cl::NDRange work_group, cl::Buffer &bits, int offset_x, int offset_y, img_data *idata, proc_data *pdata)
-    {
-        cl::Event event;
-        kernel.setArg(0, sizeof(cl::Buffer), (void *)&bits);
-        kernel.setArg(1, sizeof(float), (void *)&pdata->thresh);
-        kernel.setArg(2, sizeof(int  ), (void *)&pdata->conduction_func);
-        kernel.setArg(3, sizeof(float), (void *)&pdata->lambda);
-        kernel.setArg(4, sizeof(int), (void *)&idata->w);
-        kernel.setArg(5, sizeof(int), (void *)&idata->h);
-        kernel.setArg(6, sizeof(int), (void *)&offset_x);
-        kernel.setArg(7, sizeof(int), (void *)&offset_y);
-        queue.enqueueNDRangeKernel(kernel, cl::NullRange, work_group, cl::NullRange, nullptr, &event);
-        /* получить данные профилирования по времени */
-        event.wait();
-        cl_ulong time_start, time_end;
-        event.getProfilingInfo(CL_PROFILING_COMMAND_START, &time_start);
-        event.getProfilingInfo(CL_PROFILING_COMMAND_END, &time_end);
-        return (time_end - time_start);
-    }
-}
 
 void pm_parallel(img_data *idata, proc_data *pdata, cl_data *cdata)
 {
@@ -157,7 +131,7 @@ void pm_parallel(img_data *idata, proc_data *pdata, cl_data *cdata)
     size_t work_group_x = std::min((size_t)idata->w, max_work_group_size);
     size_t work_group_y = std::min((size_t)idata->h, max_work_group_size);
     cl::NDRange workGroup(work_group_x, work_group_y);
-    cl::EnqueueArgs enqueueArgs(queue, workGroup);
+	cl::EnqueueArgs enqueueArgs(queue, workGroup);
 
     if(cdata->verbose) {
         std::string pname, dname;
@@ -174,23 +148,30 @@ void pm_parallel(img_data *idata, proc_data *pdata, cl_data *cdata)
     int parts_y = ceil(idata->h / (float)max_work_group_size);
     int offset_x = 0, offset_y = 0;
 
-    for(int it = 0; it < pdata->iterations; ++it) {
-        for(int py = 0; py < parts_y; ++py) {
-            offset_y = py * work_group_y;
+    for(int py = 0; py < parts_y; ++py) {
+        offset_y = py * work_group_y;
 
-            for(int px = 0; px < parts_x; ++px) {
-                offset_x = px * work_group_x;
-                /* все очередные операции завершены */
-                queue.finish();
+        for(int px = 0; px < parts_x; ++px) {
+            offset_x = px * work_group_x;
 
-                if(cdata->profile) {
-                    /* выполнить ядро в режиме профилирования */
-                    total_time += profileKernel(kernel, queue, workGroup, bits, offset_x, offset_y, idata, pdata);
-                } else {
-                    /* выполнить ядро */
-                    pmKernel(enqueueArgs, bits, pdata->thresh, pdata->conduction_func, pdata->lambda, idata->w, idata->h, offset_x, offset_y);
-                }
-            }
+			for (int it = 0; it < pdata->iterations; ++it) {
+				/* все очередные операции завершены */
+				queue.finish();
+
+				if(cdata->profile) {
+					/* выполнить ядро в режиме профилирования */
+					cl::Event event = pmKernel(enqueueArgs, bits, pdata->thresh, pdata->conduction_func, pdata->lambda, idata->w, idata->h, offset_x, offset_y);
+					/* получить данные профилирования по времени */
+					event.wait();
+					cl_ulong time_start, time_end;
+					event.getProfilingInfo(CL_PROFILING_COMMAND_START, &time_start);
+					event.getProfilingInfo(CL_PROFILING_COMMAND_END, &time_end);
+					total_time += (time_end - time_start);
+				} else {
+					/* выполнить ядро */
+					pmKernel(enqueueArgs, bits, pdata->thresh, pdata->conduction_func, pdata->lambda, idata->w, idata->h, offset_x, offset_y);
+				}
+			}
         }
     }
 
