@@ -5,13 +5,6 @@
   \copyright (c) 2016, Research Institute of Instrument Engineering
 */
 
-#include <iostream> /* cout, endl */
-#include <fstream>
-#include <iomanip>  /* setprecision, fixed */
-#include <cstdlib>  /* exit */
-#include <cmath>    /* exp */
-#include <ctime>    /* clock_t */
-
 #define __CL_ENABLE_EXCEPTIONS 
 
 #if defined(__APPLE__) || defined(__MACOSX)
@@ -20,11 +13,21 @@
     #include <CL/cl.hpp>
 #endif
 
+#include <iostream> /* cout, endl */
+#include <fstream>  /* fstream */
+#include <iomanip>  /* setprecision, fixed */
+#include <cstdlib>  /* exit */
+#include <cmath>    /* exp */
+#include <ctime>    /* clock_t */
+
 extern "C" {
-    #include "pm.h"			 /* pm(...)	  */
+    #include "pm.h"      /* pm(...)	  */
 }
-#include "pm_ocl.hpp"
+
+#include "pm_ocl.hpp"    /* pm_parallel(...) */
 #include "ppm_image.hpp" /* PPMImage  */
+
+#define VERSION "1.0"
 
 //---------------------------------------------------------------
 // Прототипы
@@ -32,6 +35,7 @@ extern "C" {
 char *getArgOption(char **, char **, const char *);
 bool isArgOption(char **, char **, const char *);
 void printHelp();
+
 //---------------------------------------------------------------
 // Точка входа
 //---------------------------------------------------------------
@@ -48,10 +52,12 @@ int main(int argc, char *argv[])
     int run_mode = 1;   /*[0,1,2]*/
     std::string kernel_file = "kernel.cl";
     std::string bitcode_file;
+
+    /* считывание аргументов командной строки */
+    
     bool profile = isArgOption(argv, argv + argc, "-g");
     bool verbose = isArgOption(argv, argv + argc, "-v");
 
-    /* считывание аргументов командной строки */
     if(isArgOption(argv, argv + argc, "-h")) {  /* справка */
         printHelp();
         exit(EXIT_SUCCESS); // -> EXIT_SUCCESS
@@ -133,8 +139,8 @@ int main(int argc, char *argv[])
         char *platform_str  = getArgOption(argv, argv + argc, "-p");        /* индекс платформы */
         char *device_str    = getArgOption(argv, argv + argc, "-d");        /* индекс устройства */
         char *rmode_str     = getArgOption(argv, argv + argc, "-r");        /* режим запуска [0,1,2] */
-        char *kernel_file_str = getArgOption(argv, argv + argc, "-k");      /* файл с ядром программы*/
-        char *bitcode_file_str = getArgOption(argv, argv + argc, "-b");      /* файл с бит кодом*/
+        char *kernel_file_str = getArgOption(argv, argv + argc, "-k");      /* файл с ядром программы */
+        char *bitcode_file_str = getArgOption(argv, argv + argc, "-b");     /* файл с бит кодом */
 
         if(iter_str) iterations = atoi(iter_str);
 
@@ -191,9 +197,7 @@ int main(int argc, char *argv[])
         std::cout << "reading input image..." << std::endl;
     }
 
-    /* Загрузка изображения (.ppm) */
-    /* .ppm хранит rgb изображения, но алгоритм адаптировван
-       для работы с rgba, поэтому выполним конвертацию  */
+    /* загрузка изображения (.ppm) */
     PPMImage input_img;
 
     try {
@@ -203,22 +207,24 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    /* "Упаковка" rgba каналов в unsigned int */
+    /* "упаковка" rgb каналов в unsigned int */
     unsigned int *packed_data = nullptr;
     size_t packed_size = input_img.packData(&packed_data);
     input_img.clear();
-    /* Данные изображения и параметры обработки */
+    /* данные изображения и параметры обработки */
     img_data idata = { packed_data, packed_size,
                        input_img.width, input_img.height
                      };
-    /* Выбор функции для вычисления коэффициента проводимости */
+    /* выбор функции для вычисления коэффициента проводимости */
     conduction conduction_ptr = conduction_function ? &pm_exponential : &pm_quadric;
     proc_data pdata = {iterations, conduction_function, conduction_ptr, thresh, lambda};
-    /* Отфильтрованное изображение */
+    /* отфильтрованное изображение */
     PPMImage ouput_img(idata.w, idata.h);
 
     //---------------------------------------------------------------------------------
-    if(run_mode == 0 || run_mode == 2) {    // Последовательная фильтрация
+    // последовательная фильтрация
+    //---------------------------------------------------------------------------------
+    if(run_mode == 0 || run_mode == 2) {    
         if(verbose) {
            std::cout << "processing sequentially..." << std::endl;
         }
@@ -237,24 +243,33 @@ int main(int argc, char *argv[])
         if(verbose) {
             std::cout << "saving image..." << std::endl;
         }
+
         ouput_img.unpackData(idata.bits, packed_size);
-        PPMImage::save(PPMImage::toRGB(ouput_img), std::string(dest));
+
+        try
+        {
+            PPMImage::save(PPMImage::toRGB(ouput_img), std::string(dest));
+        } catch(std::invalid_argument e) {
+            std::cerr << e.what();
+        }
+
         delete[] packed_data;
         packed_data = nullptr;
     }
 
     //---------------------------------------------------------------------------------
-    if(run_mode == 1 || run_mode == 2) {    // Параллельная фильтрация
+    // параллельная фильтрация
+    //---------------------------------------------------------------------------------
+    if(run_mode == 1 || run_mode == 2) {
         if(verbose) {
             std::cout << "processing in parallel..." << std::endl;
         }
+
         input_img = PPMImage::toRGB(PPMImage::load(src));
         packed_size = input_img.packData(&packed_data);
         input_img.clear();
-        /* Запуск параллельной фильтрации */
-
+        
         cl_data cdata = { platformId, deviceId, profile, kernel_file, false, verbose};
-
         if(!bitcode_file.empty()) {
             cdata.filename = bitcode_file;
             cdata.bitcode = true;
@@ -262,10 +277,13 @@ int main(int argc, char *argv[])
 
         try
         {
+            /* запуск параллельной фильтрации */
             pm_parallel(&idata, &pdata, &cdata);
+            
             if(verbose) {
                 std::cout << "saving image..." << std::endl;
             }
+            
             ouput_img.unpackData(idata.bits, packed_size);
             PPMImage::save(PPMImage::toRGB(ouput_img), std::string(dest));
             
@@ -281,12 +299,12 @@ int main(int argc, char *argv[])
         packed_data = nullptr;
     }
 
-    //---------------------------------------------------------------------------------
     if(verbose) {
         std::cout << "done\n" << std::endl;
     }
     return 0;
 }
+
 //---------------------------------------------------------------
 // Вспомогательные функции
 //---------------------------------------------------------------
@@ -348,10 +366,13 @@ bool isArgOption(char **begin, char **end, const char *option)
 void printHelp()
 {
     std::cout << "GPU Powered Perona – Malik Anisotropic Filter" << std::endl <<
-              "Ilya Shoshin (Galarius), 2016-2017" << std::endl <<
-              "Research Institute of Instrument Engineering" << std::endl << std::endl <<
+              "Version: " << VERSION << std::endl <<
+              "Author: Ilya Shoshin (Galarius)" << std::endl <<
+              "Copyright (c) 2016, Research Institute of Instrument Engineering" << std::endl << 
+              std::endl <<
               "USAGE" << std::endl <<
-              "-----" << std::endl << std::endl <<
+              "-----" << std::endl << 
+              std::endl <<
               "./pm [-i -t -f -p -d -r -k -b -g -v] source_file.ppm destination_file.ppm" << std::endl <<
               "----------------------------------------------------------------" << std::endl <<
               "   -i <iterations>" << std::endl <<
@@ -370,7 +391,10 @@ void printHelp()
               "   -pi (shows platform list)"  << std::endl <<
               "   -di <platform index> (shows devices list)" << std::endl <<
               "   -h (help)" << std::endl << std::endl <<
-              "Example" << std::endl <<
+              "Examples" << std::endl <<
               "-------" << std::endl <<
-              "   ./pm -i 16 -t 30 -f 1 images/in.ppm images/out.ppm"<< std::endl;
+              "   ./pm -v -i 16 -t 30 -f 1 in.ppm out.ppm"<< std::endl <<
+              "   ./pm -g in.ppm out.ppm"<< std::endl <<
+              "   ./pm -k kernel/kernel.cl in.ppm out.ppm"<< std::endl <<
+              "   ./pm -b kernel.gpu_64.bc in.ppm out.ppm"<< std::endl;
 }
