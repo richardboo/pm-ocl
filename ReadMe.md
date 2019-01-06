@@ -1,8 +1,12 @@
 # GPU Powered Perona - Malik Anisotropic Filter
 
-The implementation of Perona - Malik anisotropic smoothing filter on a GPU using OpenCL.
+<div align=justify>
 
-| ![o](assets/in.orig.s256.png) | ![p](assets/out.gpu.s256.i16.t21.f1.png) |
+The implementation of Perona - Malik anisotropic smoothing filter on a GPU using OpenCL. The filter features a built-in edge detector and because of this is able to preserve meaningful contours during smoothing.
+
+</div>
+
+| ![o](assets/in.png) | ![p](assets/out.png) |
 | --- | --- |
 | Original | Filtered |
 
