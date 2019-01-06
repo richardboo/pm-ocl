@@ -1,8 +1,8 @@
 /*!
-  \file ppm_image.cpp
+  \file
   \brief PPM image io
-  \author Ilya Shoshin (Galarius), 2016-2017
-  		  State Research Institute of Instrument Engineering
+  \author Ilya Shoshin (Galarius)
+  \copyright (c) 2016, Research Institute of Instrument Engineering
 */
 
 #include "ppm_image.hpp"

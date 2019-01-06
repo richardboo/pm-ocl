@@ -1,8 +1,8 @@
 /*!
-  \file pm.h
+  \file
   \brief Последовательная реализация фильтра Перона-Малика
-  \author Ilya Shoshin (Galarius), 2016-2017
-          State Research Institute of Instrument Engineering
+  \author Ilya Shoshin (Galarius)
+  \copyright (c) 2016, Research Institute of Instrument Engineering
 */
 
 #ifndef __pm_h__

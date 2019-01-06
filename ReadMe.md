@@ -46,7 +46,7 @@ Example
 
 ---
 
-## Publications 
+## Publications
 
 ### "Employing the Perona - Malik anisotropic filter for the problem of landing site detection"
 
@@ -59,7 +59,5 @@ Example
 ## License
 
 MIT License
-
-Copyright (c) 2016 Shoshin Ilya (Galarius), State Research Institute of Instrument Engineering
 
 See the [LICENSE.txt](LICENSE.txt) for more details.

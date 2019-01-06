@@ -1,8 +1,8 @@
 /*!
-  \file	main.cpp
+  \file
   \brief  GPU Powered Perona – Malik Anisotropic Filter
-  \author Ilya Shoshin (Galarius), 2016-2017
-            State Research Institute of Instrument Engineering
+  \author Ilya Shoshin (Galarius)
+  \copyright (c) 2016, Research Institute of Instrument Engineering
 */
 
 #include <iostream> /* cout, endl */
@@ -349,7 +349,7 @@ void printHelp()
 {
     std::cout << "GPU Powered Perona – Malik Anisotropic Filter" << std::endl <<
               "Ilya Shoshin (Galarius), 2016-2017" << std::endl <<
-              "State Research Institute of Instrument Engineering" << std::endl << std::endl <<
+              "Research Institute of Instrument Engineering" << std::endl << std::endl <<
               "USAGE" << std::endl <<
               "-----" << std::endl << std::endl <<
               "./pm [-i -t -f -p -d -r -k -b -g -v] source_file.ppm destination_file.ppm" << std::endl <<

@@ -1,8 +1,8 @@
 /*!
-  \file pm_ocl.hpp
+  \file
   \brief Параллельная реализация фильтра Перона-Малика
-  \author Ilya Shoshin (Galarius), 2016-2017
-          State Research Institute of Instrument Engineering
+  \author Ilya Shoshin (Galarius)
+  \copyright (c) 2016, Research Institute of Instrument Engineering
 */
 
 #ifndef __pm_ocl_hpp__

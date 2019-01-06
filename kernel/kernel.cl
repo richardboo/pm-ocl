@@ -1,8 +1,8 @@
 /*!
-  \file kernel.cl
+  \file
   \brief  OpenCL Kernel
-  \author Ilya Shoshin (Galarius), 2016-2017
-  		  State Research Institute of Instrument Engineering
+  \author Ilya Shoshin (Galarius)
+  \copyright (c) 2016, Research Institute of Instrument Engineering
 */
 
 #define PM_RED(rgb)     (( (rgb) >> 16) & 0xffu)
