@@ -17,7 +17,7 @@ make
 ## Usage
 
 ```
-./pm [-i -t -f -p -d -r -k -b] source_file.ppm destination_file.ppm
+./pm [-i -t -f -p -d -r -k -b -g -v] source_file.ppm destination_file.ppm
 ----------------------------------------------------------------
    -i <iterations>
    -t <conduction function threshold> ]
@@ -27,6 +27,8 @@ make
    -r <run mode (0-sequential, 1-parallel {default}, 2-both )>
    -k <kernel file (default:kernel.cl)>
    -b <bitcode file>
+   -g - profile
+   -v - verbose
 
 ./pm [-pi -di -h]
 -----------------
@@ -34,9 +36,12 @@ make
    -di <platform index> (shows devices list)
    -h (help)
 
-Example
+Examples
 -------
-   ./pm -i 16 -t 30 -f 1 images/in.ppm images/out.ppm
+   ./pm -v -i 16 -t 30 -f 1 in.ppm out.ppm
+   ./pm -g in.ppm out.ppm
+   ./pm -k kernel/kernel.cl in.ppm out.ppm
+   ./pm -b kernel.gpu_64.bc in.ppm out.ppm
 ```
 
 ## Requirements
